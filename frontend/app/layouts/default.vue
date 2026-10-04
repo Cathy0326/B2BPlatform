@@ -3,8 +3,14 @@ const links = [
   { to: '/', label: 'Equipment' },
   { to: '/auctions', label: 'Auctions' },
   { to: '/financing', label: 'Financing' },
+  { to: '/deals', label: 'My deals' },
+  { to: '/ledger', label: 'Ledger' },
   { to: '/escrow', label: 'Escrow' },
 ]
+const source = useDataSourceLabel()
+const authMode = useAuthMode()
+const user = useCurrentUser()
+const { login, logout } = useAuth()
 </script>
 
 <template>
@@ -18,6 +24,16 @@ const links = [
         <nav aria-label="Main">
           <NuxtLink v-for="l in links" :key="l.to" :to="l.to" class="nav-link">{{ l.label }}</NuxtLink>
         </nav>
+        <div class="account">
+          <template v-if="authMode === 'auth0'">
+            <ClientOnly>
+              <span v-if="user.authenticated" class="who">{{ user.displayName }}</span>
+              <button v-if="user.authenticated" class="hbtn" @click="logout()">Log out</button>
+              <button v-else class="hbtn hbtn-primary" @click="login()">Log in</button>
+            </ClientOnly>
+          </template>
+          <span v-else class="who" title="No login in demo mode">Demo buyer · admin</span>
+        </div>
       </div>
     </header>
     <main class="container page">
@@ -26,7 +42,10 @@ const links = [
     <footer class="site-footer">
       <div class="container spread">
         <span>QuipMarket · heavy-equipment auctions, rentals &amp; escrow settlement</span>
-        <span>Demo project · Nuxt 4 · Spring Boot GraphQL · PostgreSQL</span>
+        <span>
+          Data: <strong>{{ source === 'graphql' ? 'live GraphQL API' : 'in-browser demo data' }}</strong>
+          · Nuxt 4 · Spring Boot GraphQL · PostgreSQL
+        </span>
       </div>
     </footer>
   </div>
@@ -101,6 +120,33 @@ nav {
     padding-bottom: 8px;
     margin: 0 -10px;
   }
+}
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.who {
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.hbtn {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.hbtn-primary {
+  background: var(--brand);
+  border-color: transparent;
+  color: var(--brand-ink);
 }
 .site-footer {
   border-top: 1px solid var(--border);

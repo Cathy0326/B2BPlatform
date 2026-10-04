@@ -5,6 +5,8 @@ const route = useRoute()
 const id = route.params.id as string
 const room = useAuctionRoom(id)
 const { auction, equipment, status, user } = room
+const source = useDataSourceLabel()
+const { data: paymentConfig } = usePaymentConfig()
 
 useSeoMeta({ title: () => (equipment.value ? `Auction: ${equipment.value.title}` : 'Auction') })
 </script>
@@ -73,7 +75,10 @@ useSeoMeta({ title: () => (equipment.value ? `Auction: ${equipment.value.title}`
           <template v-if="room.result.value.sold">
             Sold for <strong>{{ formatCents(room.result.value.hammerPriceCents!) }}</strong>
             to {{ bidderLabel(room.result.value.winnerId!, user.id) }}.
-            <span v-if="room.result.value.winnerId === user.id"> Your deposit is applied to the payment. Funds move to escrow next.</span>
+            <span v-if="room.iWon.value">
+              Your deposit is applied to the price.
+              <NuxtLink v-if="source === 'graphql'" to="/deals"><strong>Go to your escrow deal →</strong></NuxtLink>
+            </span>
           </template>
           <template v-else>Ended without a sale (reserve not met). All deposit holds are released.</template>
         </div>
@@ -86,7 +91,10 @@ useSeoMeta({ title: () => (equipment.value ? `Auction: ${equipment.value.title}`
           :my-max="room.myMax.value"
           :hold="room.hold.value"
           :busy="room.busy.value"
-          @register="room.register()"
+          :source="source"
+          :stripe-key="paymentConfig?.stripePublishableKey ?? null"
+          @register="room.register($event)"
+          @confirm="room.confirmRegistration()"
           @bid="room.bid($event)"
         />
         <div

@@ -27,11 +27,13 @@ export function auctionStatus(a: Pick<Auction, 'startsAt' | 'endsAt'>, now: numb
 
 /** Lowest max a NEW challenger may submit right now. */
 export function minimumNextBidCents(a: Auction): Cents {
+  if (a.server) return a.server.minimumNextBidCents
   if (a.leaderId == null) return a.startingPriceCents
   return a.currentPriceCents + bidIncrementCents(a.currentPriceCents)
 }
 
 export function reserveMet(a: Auction): boolean {
+  if (a.server) return a.server.reserveMet
   return a.reservePriceCents == null || (a.leaderId != null && a.currentPriceCents >= a.reservePriceCents)
 }
 
@@ -45,7 +47,9 @@ export function placeBid(auction: Auction, bidderId: string, maxCents: Cents, no
   if (status === 'UPCOMING') return { ok: false, reason: 'NOT_STARTED' }
   if (status === 'ENDED') return { ok: false, reason: 'ENDED' }
 
-  const a: Auction = { ...auction, bids: [...auction.bids] }
+  // Drop server-computed fields: this function recomputes everything locally.
+  const { server: _server, ...rest } = auction
+  const a: Auction = { ...rest, bids: [...auction.bids] }
   const push = (b: Omit<VisibleBid, 'at'>) => a.bids.push({ ...b, at: now })
 
   if (a.leaderId === bidderId) {

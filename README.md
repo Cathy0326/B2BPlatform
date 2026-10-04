@@ -1,39 +1,87 @@
 # QuipMarket
 
+[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml)
+
 **Heavy-equipment auctions, rentals & escrow settlement**, a B2B marketplace where bids can't race, bookings can't double-book, and every dollar is traceable through a double-entry ledger.
 
-> 重型设备 B2B 交易平台：在线竞拍、按天租赁、托管结算。出价不会冲突、预订不会重叠，每一分钱都能在复式账本里追溯。
+| Live auction | Escrow deal | Ledger & audit |
+|---|---|---|
+| ![auction](docs/screenshots/10-live-auction.png) | ![deal](docs/screenshots/13-deal-paid-out.png) | ![ledger](docs/screenshots/14-ledger.png) |
+
+## Tech stack
 
 | Layer | Tech |
 |---|---|
-| Frontend | Nuxt 4 (Vue 3, TypeScript, SSR) |
-| Backend *(Phase 2)* | Java 21, Spring Boot 3, Spring for GraphQL, modular monolith |
-| Data *(Phase 2)* | PostgreSQL 16, Flyway |
-| Payments *(Phase 3)* | `PaymentGateway` interface: simulated + Stripe test mode |
-| Platform *(Phase 4)* | Auth0, Docker, GitHub Actions, Kubernetes, OpenTofu |
+| Frontend | Nuxt 4 (Vue 3, TypeScript, SSR), Stripe Elements, Auth0 SPA SDK |
+| Backend | Java 21, Spring Boot 4.1, Spring for GraphQL (queries, mutations, WebSocket subscriptions), modular monolith verified by Spring Modulith |
+| Data | PostgreSQL 16, Flyway, plain SQL via `JdbcClient`, LISTEN/NOTIFY for cross-replica events |
+| Payments | `PaymentGateway` strategy: simulated (default) or Stripe test mode (PaymentIntents, manual capture, signed webhooks) |
+| Money & audit | Double-entry ledger (balanced and append-only, enforced by PostgreSQL), SHA-256 hash-chained audit log |
+| Security | Auth0 (OAuth2/JWT, issuer + audience validation, roles), token-bucket rate limiting, GraphQL depth/complexity limits |
+| Delivery | Docker (multi-stage, non-root), GitHub Actions, Kubernetes manifests, OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS) |
 
-## Features
+## Highlights
 
-- **Catalog**: filter and sort heavy equipment; filters live in the URL, so they are shareable and survive a refresh.
-- **Live auctions**: proxy (max) bidding, price-then-time priority, 2-minute soft close against sniping, reserve prices.
-- **Escrow deposits**: bidders hold a refundable deposit before bidding.
-- **Rentals**: the cheapest day/week/month mix (dynamic programming), overlap detection, and a suggested next free window.
-- **Financing**: an amortization schedule computed in integer cents, plus a buy-vs-rent break-even.
+- **Live auctions**: proxy (max) bidding with price-then-time priority, a 2-minute soft close against sniping, and reserve prices. Updates are pushed over WebSockets.
+- **Concurrency-safe by construction**:
+  - a PostgreSQL `EXCLUDE` constraint makes double booking impossible
+  - a per-lot row lock serializes bids
+  - both are proven by 40–50-thread race tests
+- **Escrow settlement**:
+  - deposits are card *authorizations*, and losing bidders' holds are voided automatically
+  - the winner's deposit is captured and the balance paid into escrow
+  - the seller is paid only after the buyer confirms delivery
+- **Fintech-grade money handling**:
+  - every movement is a balanced journal entry
+  - `Idempotency-Key` on money-moving mutations
+  - a saga with deterministic provider idempotency keys
+  - de-duplicated, signature-verified webhooks
+  - a tamper-evident audit chain
+- **No N+1**: nested GraphQL fields are batched, and a test counts SQL statements.
+- **Rentals & financing**: the cheapest day/week/month mix (dynamic programming), a next-free-window suggestion, and amortization schedules computed in integer cents.
 
 ## Run it
 
+**Frontend only (mock data, no backend):**
 ```bash
-cd frontend
-npm install
-npm run dev      # http://localhost:3000
-npm test         # unit tests (Vitest)
+cd frontend && npm install && npm run dev        # http://localhost:3000
 ```
+
+**Everything in containers:**
+```bash
+docker compose --profile app up --build          # frontend :3000 · API :8080/graphql · GraphiQL :8080/graphiql
+```
+
+**Develop locally (Docker for the DB + JDK 21 + Node 22):**
+```bash
+docker compose up -d db
+cd backend  && ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
+```
+
+**Tests:**
+```bash
+cd frontend && npm test && npm run typecheck     # 57 unit tests
+cd backend  && ./mvnw verify                     # 41 unit + 41 Testcontainers integration tests
+```
+
+Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover docs.
+
+## Documentation
+
+| Doc | What's inside |
+|---|---|
+| [Phase 1](docs/handover/phase-1.md) | Nuxt frontend: catalog, auctions, rentals, financing |
+| [Phase 2](docs/handover/phase-2.md) | Spring Boot GraphQL + PostgreSQL, concurrency, N+1, subscriptions |
+| [Phase 3](docs/handover/phase-3.md) | Payments (Stripe), escrow saga, double-entry ledger, idempotency, webhooks, audit chain |
+| [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
+| [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
 
 ## Roadmap
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | Nuxt frontend with mock data | ✅ [handover](docs/handover/phase-1.md) |
-| 2 | Spring Boot GraphQL + PostgreSQL: catalog, rentals (EXCLUDE constraint), authoritative auction engine, live updates | ⏳ |
-| 3 | Ledger, escrow, idempotency, Stripe test mode, webhooks, audit hash chain | ⏳ |
-| 4 | Auth0, rate limiting, Docker, CI, Kubernetes, OpenTofu | ⏳ |
+| 1 | Nuxt frontend with mock data | ✅ |
+| 2 | Spring Boot GraphQL + PostgreSQL: catalog, rentals, authoritative auction engine, live updates | ✅ |
+| 3 | Ledger, escrow, idempotency, Stripe test mode, webhooks, audit hash chain | ✅ |
+| 4 | Auth0, rate limiting, multi-replica events, Docker, CI, Kubernetes, OpenTofu | ✅ |

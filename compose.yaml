@@ -1,0 +1,65 @@
+# Local stack.
+#   Database only (develop backend/frontend on your machine):   docker compose up -d db
+#   Everything in containers:                                    docker compose --profile app up --build
+#   Frontend http://localhost:3000 · API http://localhost:8080/graphql · GraphiQL http://localhost:8080/graphiql
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: quipmarket
+      POSTGRES_USER: quipmarket
+      POSTGRES_PASSWORD: quipmarket
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quipmarket"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    profiles: ["app"]
+    build: ./backend
+    image: quipmarket-backend:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/quipmarket
+      DATABASE_USER: quipmarket
+      DATABASE_PASSWORD: quipmarket
+      SPRING_PROFILES_ACTIVE: demo
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      PAYMENTS_GATEWAY: ${PAYMENTS_GATEWAY:-simulated}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      AUTH_MODE: ${AUTH_MODE:-demo}
+      AUTH0_ISSUER: ${AUTH0_ISSUER:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
+      interval: 10s
+      retries: 12
+
+  frontend:
+    profiles: ["app"]
+    build: ./frontend
+    image: quipmarket-frontend:local
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NUXT_PUBLIC_GRAPHQL_URL: http://localhost:8080/graphql   # used by the browser
+      NUXT_GRAPHQL_URL_SERVER: http://backend:8080/graphql     # used by server-side rendering
+      NUXT_PUBLIC_AUTH0_DOMAIN: ${NUXT_PUBLIC_AUTH0_DOMAIN:-}
+      NUXT_PUBLIC_AUTH0_CLIENT_ID: ${NUXT_PUBLIC_AUTH0_CLIENT_ID:-}
+      NUXT_PUBLIC_AUTH0_AUDIENCE: ${NUXT_PUBLIC_AUTH0_AUDIENCE:-}
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

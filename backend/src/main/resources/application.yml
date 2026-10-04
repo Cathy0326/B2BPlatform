@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: quipmarket
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/quipmarket}
+    username: ${DATABASE_USER:quipmarket}
+    password: ${DATABASE_PASSWORD:quipmarket}
+  flyway:
+    locations: classpath:db/migration
+  graphql:
+    http:
+      path: /graphql
+    websocket:
+      path: /graphql-ws
+    graphiql:
+      enabled: true          # browser IDE at /graphiql (disable in production)
+    schema:
+      printer:
+        enabled: true        # GET /graphql/schema
+    cors:
+      # Applies to BOTH /graphql (HTTP) and /graphql-ws (WebSocket handshake origin check).
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+      allowed-methods: GET,POST
+      allowed-headers: "*"
+
+quipmarket:
+  # demo = X-User-Id header, no login (local/demo only). auth0 = validate Auth0 JWTs.
+  auth:
+    mode: ${AUTH_MODE:demo}
+    issuer: ${AUTH0_ISSUER:}        # e.g. https://your-tenant.us.auth0.com/
+    audience: ${AUTH0_AUDIENCE:}    # the API Identifier you create in Auth0, e.g. https://api.quipmarket.dev
+  # Payment provider: simulated (default; no keys needed) or stripe (test mode only).
+  payments:
+    gateway: ${PAYMENTS_GATEWAY:simulated}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}          # sk_test_...  NEVER commit this
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:} # pk_test_...  (public by design)
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}   # whsec_...    from `stripe listen` or the dashboard
+  escrow:
+    jobs-enabled: true
+    job-delay-ms: 15000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+# Demo profile: seeds inventory + auctions relative to "now", and runs rival bidder bots.
+spring:
+  config:
+    activate:
+      on-profile: demo
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
+quipmarket:
+  demo:
+    bots-enabled: true
+  escrow:
+    job-delay-ms: 5000

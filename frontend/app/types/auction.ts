@@ -38,6 +38,11 @@ export interface Auction {
   leaderMaxCents: Cents | null
   bids: VisibleBid[]
   extensions: number
+  /**
+   * Values computed by the backend (Phase 2+). When present they win over local computation,
+   * because the client must not know the secret reserve price.
+   */
+  server?: { hasReserve: boolean; reserveMet: boolean; minimumNextBidCents: Cents }
 }
 
 export type BidRejection = 'NOT_STARTED' | 'ENDED' | 'TOO_LOW' | 'NOT_ABOVE_OWN_MAX'

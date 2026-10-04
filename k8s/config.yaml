@@ -1,0 +1,27 @@
+# Non-secret configuration, split per workload (least privilege: each pod sees only what it needs).
+# Backend secrets live in the Secret "backend-secrets" (see secret.example.yaml.txt), mounted ONLY into the backend.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: quipmarket
+data:
+  SPRING_PROFILES_ACTIVE: ""              # production: no demo data, no bots
+  AUTH_MODE: auth0
+  PAYMENTS_GATEWAY: stripe
+  CORS_ALLOWED_ORIGINS: https://quipmarket.example.com
+  # Behind the ingress, trust X-Forwarded-For so rate limits key on the real client IP.
+  SERVER_FORWARD_HEADERS_STRATEGY: framework
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: quipmarket
+data:
+  NUXT_PUBLIC_GRAPHQL_URL: https://api.quipmarket.example.com/graphql
+  NUXT_GRAPHQL_URL_SERVER: http://backend.quipmarket.svc.cluster.local:8080/graphql
+  # Public by design (they are visible in the browser anyway): not secrets.
+  NUXT_PUBLIC_AUTH0_DOMAIN: your-tenant.us.auth0.com
+  NUXT_PUBLIC_AUTH0_CLIENT_ID: replace-with-spa-client-id
+  NUXT_PUBLIC_AUTH0_AUDIENCE: https://api.quipmarket.example.com

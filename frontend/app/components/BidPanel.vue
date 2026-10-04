@@ -12,8 +12,36 @@ const props = defineProps<{
   myMax: number | null
   hold: DepositHold | null
   busy: boolean
+  /** 'graphql' = real backend: show payment method selection. */
+  source: 'mock' | 'graphql'
+  stripeKey: string | null
 }>()
-const emit = defineEmits<{ register: []; bid: [maxCents: number] }>()
+const emit = defineEmits<{ register: [paymentMethodId: string | null]; confirm: []; bid: [maxCents: number] }>()
+const currentUser = useCurrentUser()
+const { login } = useAuth()
+
+const picker = ref<{ getPaymentMethodId(): Promise<string>; handleNextAction(secret: string): Promise<boolean> } | null>(null)
+const pickerError = ref<string | null>(null)
+
+async function onRegister() {
+  pickerError.value = null
+  if (props.source === 'mock') return emit('register', null)
+  try {
+    emit('register', (await picker.value?.getPaymentMethodId()) ?? null)
+  } catch (e) {
+    pickerError.value = (e as Error).message
+  }
+}
+
+async function onAuthenticate() {
+  pickerError.value = null
+  try {
+    if (props.hold?.clientSecret) await picker.value?.handleNextAction(props.hold.clientSecret)
+    emit('confirm')
+  } catch (e) {
+    pickerError.value = (e as Error).message
+  }
+}
 
 const input = ref('')
 const parsed = computed(() => parseDollarsToCents(input.value))
@@ -37,17 +65,31 @@ function submit() {
 
 <template>
   <div class="bid-panel stack">
-    <template v-if="status === 'LIVE'">
-      <div v-if="!hold" class="stack">
+    <template v-if="status === 'LIVE' && !currentUser.authenticated">
+      <p class="muted">Log in to place a deposit hold and bid.</p>
+      <button class="btn btn-primary btn-block" @click="login()">Log in to bid</button>
+    </template>
+    <template v-else-if="status === 'LIVE'">
+      <div v-if="!hold || hold.status === 'PENDING'" class="stack">
         <p class="muted">
           To bid, place a <strong>refundable deposit hold</strong> of
           <strong class="num">{{ formatCents(auction.depositCents) }}</strong>.
           It is only captured if you win, and released automatically if you don't.
         </p>
-        <button class="btn btn-primary btn-block" :disabled="busy" @click="emit('register')">
+        <PaymentMethodPicker v-if="source === 'graphql'" ref="picker" :stripe-key="stripeKey" />
+        <p v-if="pickerError" class="subtle err">{{ pickerError }}</p>
+        <template v-if="hold?.status === 'PENDING'">
+          <button class="btn btn-primary btn-block" :disabled="busy" @click="onAuthenticate">
+            {{ hold.clientSecret && stripeKey ? 'Complete bank authentication' : 'Check authorization again' }}
+          </button>
+          <p v-if="!stripeKey" class="subtle">
+            With the simulated provider there is no bank popup. In Stripe test mode, Stripe.js shows the 3-D Secure challenge here.
+          </p>
+        </template>
+        <button v-else class="btn btn-primary btn-block" :disabled="busy" @click="onRegister">
           Place deposit hold &amp; register
         </button>
-        <p class="subtle">Demo mode: no real money moves. Phase 3 connects Stripe (test mode).</p>
+        <p v-if="source === 'mock'" class="subtle">Demo data mode: no backend, no money moves.</p>
       </div>
 
       <form v-else class="stack" @submit.prevent="submit">

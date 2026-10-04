@@ -20,10 +20,19 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Server-only (never sent to the browser). In Docker/Kubernetes, SSR must call the backend by its
+    // internal name (http://backend:8080/graphql), while the browser uses the public URL below.
+    graphqlUrlServer: '',
     public: {
       // Empty = use the in-browser mock data (Phase 1).
       // Set NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql to use the Spring Boot API (Phase 2).
       graphqlUrl: '',
+      // Optional; derived from graphqlUrl (http -> ws, /graphql -> /graphql-ws) when empty.
+      graphqlWsUrl: '',
+      // Auth0 (all three set = auth0 mode; empty = demo mode with a built-in demo user).
+      auth0Domain: '',
+      auth0ClientId: '',
+      auth0Audience: '',
     },
   },
 })

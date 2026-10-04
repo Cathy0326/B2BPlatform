@@ -62,7 +62,7 @@ export function useAuctionRoom(auctionId: string) {
   const msToStart = computed(() => (auction.value ? Math.max(0, auction.value.startsAt - now.value) : 0))
   const minimumNext = computed(() => (auction.value ? minimumNextBidCents(auction.value) : 0))
   const isLeader = computed(() => auction.value?.leaderId === user.value.id)
-  const hasReserve = computed(() => auction.value?.reservePriceCents != null)
+  const hasReserve = computed(() => auction.value?.server?.hasReserve ?? auction.value?.reservePriceCents != null)
   const isReserveMet = computed(() => (auction.value ? reserveMet(auction.value) : false))
   const result = computed(() => (auction.value && now.value ? settleResult(auction.value, now.value) : null))
   const myMax = computed(() => (isLeader.value ? auction.value?.leaderMaxCents ?? null : null))
@@ -70,13 +70,44 @@ export function useAuctionRoom(auctionId: string) {
   const busy = ref(false)
   const message = ref<{ kind: 'success' | 'error' | 'warn'; text: string } | null>(null)
 
-  async function register() {
+  function setHold(h: DepositHold | null) {
+    hold.value = h
+    // Keep the cached payload in sync, otherwise the next live update would reset `hold` to null.
+    if (data.value) data.value = { ...data.value, hold: h }
+  }
+
+  function describeHold(h: DepositHold) {
+    if (h.status === 'HELD') return { kind: 'success' as const, text: `Deposit hold of ${formatCents(h.amountCents)} authorized. You can bid now.` }
+    return { kind: 'warn' as const, text: 'Your bank requires extra authentication (3-D Secure) before the hold is active.' }
+  }
+
+  /** paymentMethodId: Stripe PaymentMethod id or a test token; ignored by the in-browser mock. */
+  async function register(paymentMethodId?: string | null) {
+    busy.value = true
+    message.value = null
+    try {
+      const h = await api.registerToBid(auctionId, user.value.id, paymentMethodId)
+      setHold(h)
+      message.value = describeHold(h)
+    } catch (e) {
+      // e.g. PAYMENT_DECLINED: the server already removed the registration, so the user can try another card.
+      message.value = { kind: 'error', text: (e as Error).message || 'The deposit could not be authorized.' }
+    } finally {
+      busy.value = false
+    }
+  }
+
+  async function confirmRegistration() {
+    if (!api.confirmRegistration) return
     busy.value = true
     try {
-      hold.value = await api.registerToBid(auctionId, user.value.id)
-      // Keep the cached payload in sync, otherwise the next live update would reset `hold` to null.
-      if (data.value) data.value = { ...data.value, hold: hold.value }
-      message.value = { kind: 'success', text: `Deposit hold of ${formatCents(hold.value.amountCents)} placed. You can bid now.` }
+      const h = await api.confirmRegistration(auctionId)
+      if (h) {
+        setHold(h)
+        message.value = describeHold(h)
+      }
+    } catch (e) {
+      message.value = { kind: 'error', text: (e as Error).message }
     } finally {
       busy.value = false
     }
@@ -105,8 +136,10 @@ export function useAuctionRoom(auctionId: string) {
     }
   }
 
+  const iWon = computed(() => !!result.value?.sold && result.value.winnerId === user.value.id)
+
   return {
     user, now, auction, equipment, hold, loadStatus, status, msLeft, msToStart, minimumNext, isLeader,
-    hasReserve, isReserveMet, result, myMax, busy, message, flash, register, bid,
+    hasReserve, isReserveMet, result, myMax, busy, message, flash, register, confirmRegistration, bid, iWon,
   }
 }
