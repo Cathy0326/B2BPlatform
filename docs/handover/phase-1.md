@@ -47,10 +47,28 @@ npm install          # also runs `nuxt prepare`, which generates .nuxt/ types
 
 > 💡 If `npm test` says *"Failed to load tsconfig .nuxt/tsconfig.app.json"*, run `npx nuxt prepare` once.
 
-**Step 4 (optional) — Deploy to Cloudflare Pages**
-1. Cloudflare dashboard → *Workers & Pages* → *Create* → *Pages* → connect the GitHub repo.
-2. Root directory: `frontend` · Build command: `npm run build` · Framework preset: **Nuxt.js** (Cloudflare sets `NITRO_PRESET=cloudflare_pages` automatically).
-3. You get a free `*.pages.dev` URL → put it in your Upwork proposal.
+**Step 4 (optional) — Deploy to Cloudflare (Workers, free)**
+
+The site runs in mock mode, so no backend is needed. `frontend/wrangler.jsonc` holds the Worker config.
+
+1. Cloudflare dashboard → *Workers & Pages* → *Create application* → *Import a repository* → connect GitHub → pick `B2BPlatform`.
+2. Fill in *Set up your application*:
+
+   | Field | Value |
+   |---|---|
+   | Project name | `quipmarket` (must match `name` in `wrangler.jsonc`) |
+   | Build command | `npm run build:cloudflare` |
+   | Deploy command | `npx wrangler deploy` |
+   | Preview command | keep the default (`npx wrangler preview`) |
+   | Advanced settings → Path | `frontend` |
+   | API token | keep *Create new token* |
+   | Variables | none for mock mode |
+
+3. Click *Deploy*. You get a free `https://quipmarket.<your-subdomain>.workers.dev` URL; put it in your Upwork proposal.
+
+Test the same build locally: `cd frontend && npm run build:cloudflare && npx wrangler dev` → http://localhost:8787.
+On Windows PowerShell, run `$env:NITRO_PRESET='cloudflare_module'; npx nuxt build` instead of `npm run build:cloudflare`.
+`npm run build` (without `:cloudflare`) still produces the Node server used by the Docker image.
 
 ---
 
