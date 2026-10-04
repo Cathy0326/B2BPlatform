@@ -87,6 +87,7 @@
 | 6 | Subtle Spring bug | A method called on `this` silently skipped `@Transactional` (self-invocation) | Explicit TransactionTemplate; explained the proxy model | Java/Spring interviews |
 | 7 | Resilience to a third party | Public pages hung when Auth0 was unreachable | Switched to a non-blocking client; public data never waits on the identity provider | Stripe, MassQuip |
 | 8 | How do you trust an optimized matching engine? | Wrote a deliberately naive reference book with no shared code; both run the same seeded random flow and must emit identical events at every step | Planting a FOK bug fails 6 of 8 runs, and the message names the seed and step (order-book-engine) | SIG, any algorithms role |
+| 9 | CI failed once on `main` with "deadlock detected" in the 50-thread booking test, on a change that never touched the backend | Did not dismiss it as flaky: wrote a stress test (30 rounds × 50 threads) that hit it in 8 rounds; traced it to exclusion constraints being checked after insert; added a per-machine `pg_advisory_xact_lock` and kept the constraint as the guarantee | 0 of 30 bad rounds after the fix; the CI test now runs 10 rounds and fails when the lock is removed | SIG, Stripe, any backend |
 
 Tip: for each story, prepare **one number** (40 threads, 13 of 150 accepted, 82 tests) and **one trade-off** (pessimistic vs optimistic lock, LISTEN/NOTIFY vs Kafka).
 

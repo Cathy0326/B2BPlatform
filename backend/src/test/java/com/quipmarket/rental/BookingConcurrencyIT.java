@@ -22,41 +22,45 @@ class BookingConcurrencyIT {
 
     /**
      * 50 renters press "Book" for the SAME machine and the SAME week at the same instant.
-     * Exactly one must win; the other 49 must get BOOKING_CONFLICT. No application lock exists:
-     * the PostgreSQL EXCLUDE constraint is what guarantees this.
+     * Exactly one must win; the other 49 must get BOOKING_CONFLICT, never another error.
+     * The PostgreSQL EXCLUDE constraint guarantees the single winner; the per-machine advisory lock in
+     * BookingRepository makes the losers fail cleanly (without it, ~1 round in 4 hit "deadlock detected").
+     * Several rounds on different weeks, because a race that shows up 1 time in 4 hides in a single round.
      */
     @Test
     void fiftyConcurrentRequestsForTheSameDatesProduceExactlyOneBooking() throws Exception {
-        int threads = 50;
-        LocalDate start = LocalDate.parse("2027-03-01"), end = LocalDate.parse("2027-03-08");
-        var ready = new CountDownLatch(threads);
-        var go = new CountDownLatch(1);
-        var wins = new AtomicInteger();
-        var conflicts = new AtomicInteger();
+        int rounds = 10, threads = 50;
+        for (int round = 0; round < rounds; round++) {
+            LocalDate start = LocalDate.parse("2027-03-01").plusWeeks(round), end = start.plusDays(7);
+            var ready = new CountDownLatch(threads);
+            var go = new CountDownLatch(1);
+            var wins = new AtomicInteger();
+            var conflicts = new AtomicInteger();
 
-        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
-            List<Future<?>> futures = new ArrayList<>();
-            for (int i = 0; i < threads; i++) {
-                String renter = "renter-" + i;
-                futures.add(pool.submit(() -> {
-                    ready.countDown();
-                    go.await(); // release all threads together to maximize contention
-                    try {
-                        rentals.book(renter, "eq-1008", start, end);
-                        wins.incrementAndGet();
-                    } catch (BookingConflictException e) {
-                        conflicts.incrementAndGet();
-                    }
-                    return null;
-                }));
+            try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+                List<Future<?>> futures = new ArrayList<>();
+                for (int i = 0; i < threads; i++) {
+                    String renter = "renter-" + round + "-" + i;
+                    futures.add(pool.submit(() -> {
+                        ready.countDown();
+                        go.await(); // release all threads together to maximize contention
+                        try {
+                            rentals.book(renter, "eq-1008", start, end);
+                            wins.incrementAndGet();
+                        } catch (BookingConflictException e) {
+                            conflicts.incrementAndGet();
+                        }
+                        return null; // any other exception fails the test through f.get()
+                    }));
+                }
+                ready.await();
+                go.countDown();
+                for (Future<?> f : futures) f.get();
             }
-            ready.await();
-            go.countDown();
-            for (Future<?> f : futures) f.get();
-        }
 
-        assertThat(wins.get()).isEqualTo(1);
-        assertThat(conflicts.get()).isEqualTo(threads - 1);
+            assertThat(wins.get()).as("winners in round %d", round).isEqualTo(1);
+            assertThat(conflicts.get()).as("conflicts in round %d", round).isEqualTo(threads - 1);
+        }
     }
 
     @Test

@@ -227,6 +227,7 @@ Integration tests start a **real PostgreSQL 16** in Docker. An in-memory H2 data
 | 3 | Bots would have ignored the on/off switch | `@ConditionalOnProperty` on a **method** does nothing (it's for bean definitions) | Read the flag with `@Value` | Know where an annotation actually applies |
 | 4 | `mvn test` showed only 29 tests | `*IT` classes are run by **Failsafe**, not Surefire | Added `maven-failsafe-plugin` → `mvn verify` | Fast unit tests vs slower integration tests |
 | 5 | My first end-to-end check passed **without proving anything** | The user was already leading, so the price couldn't change | New test: another user bids through the API, and the open browser updates without reload | A test that can't fail proves nothing; check that it *can* fail |
+| 6 | (Found later, by CI on `main`) the 50-thread booking test failed **once**: `deadlock detected` instead of `BOOKING_CONFLICT` | An `EXCLUDE` constraint is checked *after* the insert, so two transactions inserting overlapping rows at the same instant can each wait for the other's uncommitted row; a local stress run hit it in 8 of 30 rounds | `pg_advisory_xact_lock` per machine before the insert (the constraint still guarantees correctness); the test now runs 10 rounds and fails without the lock | An intermittent CI failure is a real bug until proven otherwise: reproduce it, fix it, make the test catch it |
 
 ---
 
