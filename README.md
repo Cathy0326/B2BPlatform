@@ -18,7 +18,7 @@
 | Payments | `PaymentGateway` strategy: simulated (default) or Stripe test mode (PaymentIntents, manual capture, signed webhooks) |
 | Money & audit | Double-entry ledger (balanced and append-only, enforced by PostgreSQL), SHA-256 hash-chained audit log |
 | Security | Auth0 (OAuth2/JWT, issuer + audience validation, roles), token-bucket rate limiting, GraphQL depth/complexity limits |
-| Delivery | Docker (multi-stage, non-root), GitHub Actions, Kubernetes manifests, OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS) |
+| Delivery | Docker (multi-stage, non-root), GitHub Actions (every push deploys to a throwaway kind cluster and smoke-tests it), Kubernetes manifests, OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS) |
 
 ## Highlights
 

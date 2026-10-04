@@ -54,7 +54,7 @@
 **General / MassQuip (full stack, Nuxt + Spring GraphQL):**
 - Built a heavy-equipment auction and rental marketplace with a **Nuxt 4 SSR** frontend and a **Spring Boot 4 GraphQL** modular monolith on **PostgreSQL**, with real-time bidding over GraphQL subscriptions.
 - Eliminated GraphQL **N+1 queries** with DataLoader batching; a test counts SQL statements to keep nested lists at a constant number of queries.
-- Containerized with multi-stage, non-root Docker images; **GitHub Actions** CI runs Testcontainers integration tests and publishes images; deployment defined with **Kubernetes** manifests and **OpenTofu** (Linode LKE, managed Postgres, Cloudflare).
+- Containerized with multi-stage, non-root Docker images; **GitHub Actions** CI runs Testcontainers integration tests, **deploys the Kubernetes manifests to a throwaway kind cluster and smoke-tests the running stack** on every push, and publishes images; production infrastructure written in **OpenTofu** (Linode LKE, managed Postgres, Cloudflare).
 
 **Stripe (payments, API design, reliability):**
 - Designed **idempotent payment mutations** (Idempotency-Key with request-hash verification) and a settlement **saga** with deterministic provider idempotency keys, so client retries and crash recovery never charge twice.
@@ -98,7 +98,7 @@ Tip: for each story, prepare **one number** (40 threads, 13 of 150 accepted, 82 
 2. **(60 s) Auction room:** register with **"Card declined"** → error; then **Visa** → hold authorized; bid; open a second tab and bid as a bot or second user → the first tab updates live.
 3. **(60 s) Escrow:** once a lot ends, open **My deals** → Pay balance → Confirm delivery → stepper reaches *Seller paid*.
 4. **(60 s) Ledger:** trial balance *Balanced*; show the four entries of the deal; audit chain *Intact*.
-5. **(60 s) Engineering:** open `BookingConcurrencyIT` (50 threads) and `EscrowFlowIT`; show the green **Actions** run; open `k8s/backend.yaml` (probes, non-root).
+5. **(60 s) Engineering:** open `BookingConcurrencyIT` (50 threads) and `EscrowFlowIT`; show the green **Actions** run; open `k8s/base/backend.yaml` (probes, non-root).
 6. **(30 s) Close:** "Happy to walk through the saga or the locking strategy in more depth."
 
 Run it locally with `docker compose --profile app up --build`. Practice twice with a timer.
