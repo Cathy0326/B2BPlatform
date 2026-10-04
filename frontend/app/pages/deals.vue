@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import type { EscrowDeal } from '~/types/escrow'
 import { ESCROW_STEPS } from '~/types/escrow'
-import { createEscrowApi } from '~/services/graphql/escrowApi'
 
 useSeoMeta({ title: 'My escrow deals' })
 
-const gql = useGraphQlClient()
 const currentUser = useCurrentUser()
 const { login } = useAuth()
-const api = gql ? createEscrowApi(gql) : null
+const api = useEscrowApi()
+const demo = useDataSourceLabel() === 'mock'
 const { data: paymentConfig } = usePaymentConfig()
 
-const { data: deals, status, refresh } = useAsyncData('my-deals', async () => (api ? api.myDeals() : []), {
+const { data: deals, status, refresh } = useAsyncData('my-deals', () => (currentUser.value.authenticated ? api.myDeals() : Promise.resolve([])), {
   server: false,
   default: () => [] as EscrowDeal[],
+  watch: [() => currentUser.value.id],
 })
 
 const busy = ref<string | null>(null)
@@ -25,7 +25,6 @@ function stepIndex(d: EscrowDeal) {
 }
 
 async function act(d: EscrowDeal, action: 'pay' | 'confirm') {
-  if (!api) return
   busy.value = d.id
   try {
     if (action === 'pay') {
@@ -57,17 +56,19 @@ onBeforeUnmount(() => clearInterval(poll))
       <p class="muted">Auctions you won. The money stays in escrow until you confirm the machine arrived as described.</p>
     </div>
 
-    <div v-if="!api" class="card">
-      <p>Escrow needs the backend. Start the Spring Boot API and set <code>NUXT_PUBLIC_GRAPHQL_URL</code>.</p>
+    <p v-if="demo" class="alert demo-note" role="note">
+      <strong>Demo mode:</strong> deals, payments and ledger entries are simulated in your browser (test cards only, nothing is charged)
+      and reset when you reload. The same state machine runs in the Spring Boot backend.
       <NuxtLink to="/escrow">How escrow works →</NuxtLink>
-    </div>
-    <div v-else-if="!currentUser.authenticated" class="card">
+    </p>
+
+    <div v-if="!currentUser.authenticated" class="card">
       <p>Log in to see the auctions you won.</p>
       <button class="btn btn-primary" @click="login()">Log in</button>
     </div>
     <p v-else-if="(status === 'idle' || status === 'pending') && !deals.length" class="muted">Loading deals…</p>
     <div v-else-if="!deals.length" class="card">
-      <p>No deals yet. Win an auction and it will appear here a few seconds after the auction closes.</p>
+      <p>No deals yet. Win an auction and it will appear here {{ demo ? 'once the auction closes' : 'a few seconds after the auction closes' }}.</p>
       <NuxtLink to="/auctions" class="btn btn-primary">Browse auctions</NuxtLink>
     </div>
 
@@ -181,6 +182,9 @@ onBeforeUnmount(() => clearInterval(poll))
 }
 summary {
   cursor: pointer;
+}
+.demo-note {
+  margin: 0;
 }
 code {
   font-family: var(--mono);

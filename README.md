@@ -61,7 +61,7 @@ cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
 
 **Tests:**
 ```bash
-cd frontend && npm test && npm run typecheck     # 57 unit tests
+cd frontend && npm test && npm run typecheck     # 81 unit tests
 cd backend  && ./mvnw verify                     # 41 unit + 41 Testcontainers integration tests
 ```
 

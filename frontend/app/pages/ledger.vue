@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { createEscrowApi } from '~/services/graphql/escrowApi'
-
 useSeoMeta({ title: 'Ledger & audit trail' })
 
-const gql = useGraphQlClient()
 const isAdmin = useIsAdmin()
-const api = gql ? createEscrowApi(gql) : null
+const api = useEscrowApi()
+const demo = useDataSourceLabel() === 'mock'
 // The API also enforces this (FORBIDDEN): hiding the page is UX, the server check is security.
-const { data, status, refresh } = useAsyncData('ledger', async () => (api && isAdmin.value ? api.ledgerOverview() : null), {
+const { data, status, refresh } = useAsyncData('ledger', async () => (isAdmin.value ? api.ledgerOverview() : null), {
   server: false,
   watch: [isAdmin],
 })
@@ -26,14 +24,16 @@ const short = (h: string) => `${h.slice(0, 10)}…`
         <h1>Ledger &amp; audit trail</h1>
         <p class="muted">Every money movement is a balanced, append-only journal entry. Every event is hash-chained.</p>
       </div>
-      <button v-if="api" class="btn" @click="refresh()">Refresh</button>
+      <button class="btn" @click="refresh()">Refresh</button>
     </div>
 
-    <div v-if="!api" class="card">
-      <p>The ledger lives in the backend. Start the Spring Boot API and set <code>NUXT_PUBLIC_GRAPHQL_URL</code>.</p>
-      <NuxtLink to="/escrow">See a worked example →</NuxtLink>
-    </div>
-    <div v-else-if="!isAdmin" class="card">
+    <p v-if="demo" class="alert demo-note" role="note">
+      <strong>Demo mode:</strong> this ledger and audit chain are computed in your browser from the demo deals
+      (try paying a balance on <NuxtLink to="/deals">My deals</NuxtLink>, then refresh). In the full stack they live in PostgreSQL,
+      where triggers reject unbalanced or edited entries.
+    </p>
+
+    <div v-if="!isAdmin" class="card">
       <p><strong>Administrator role required.</strong> The ledger shows every customer's money.</p>
     </div>
     <p v-else-if="(status === 'idle' || status === 'pending') && !data" class="muted">Loading ledger…</p>
@@ -119,6 +119,9 @@ const short = (h: string) => `${h.slice(0, 10)}…`
 }
 .bad {
   color: var(--bad);
+}
+.demo-note {
+  margin: 0;
 }
 .mono {
   font-family: var(--mono);
