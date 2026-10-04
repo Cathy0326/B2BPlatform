@@ -2,7 +2,7 @@
 
 > **Status:** ✅ Complete · 57 unit tests passing · typecheck clean · production build OK · checked in Chromium (desktop, mobile, dark mode)
 >
-> **Branch:** `claude/focused-tesla-iuub77` · **Folder:** `frontend/`
+> **Folder:** `frontend/`
 
 ---
 
@@ -31,7 +31,6 @@ npm -v
 ```powershell
 git clone https://github.com/Cathy0326/B2BPlatform.git
 cd B2BPlatform
-git checkout claude/focused-tesla-iuub77
 cd frontend
 npm install          # also runs `nuxt prepare`, which generates .nuxt/ types
 ```
