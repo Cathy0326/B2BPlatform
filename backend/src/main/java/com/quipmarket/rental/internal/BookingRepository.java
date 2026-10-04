@@ -12,6 +12,8 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 class BookingRepository {
@@ -42,8 +44,18 @@ class BookingRepository {
      * Insert, letting the database decide whether the dates are free.
      * There is deliberately NO "check then insert" in Java: two requests could both pass the check
      * and both insert (a race). The EXCLUDE constraint makes the check and the insert one atomic step.
+     *
+     * The advisory lock is NOT what prevents double booking (the constraint is). It prevents a deadlock:
+     * an exclusion constraint is checked after the row is inserted, so two transactions inserting
+     * overlapping rows at the same instant can each wait for the other's uncommitted row, and PostgreSQL
+     * aborts one with "deadlock detected" instead of an exclusion violation. Queuing bookings per machine
+     * makes the loser see the winner's committed row and get a clean BOOKING_CONFLICT.
+     * Different machines hash to different locks, so they never wait for each other (barring a hash collision).
+     * MANDATORY: the lock is released at commit, so it only works inside the caller's transaction.
      */
+    @Transactional(propagation = Propagation.MANDATORY)
     Booking insert(String equipmentId, String renterId, LocalDate start, LocalDate end, long totalCents) {
+        jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:eq, 0))").param("eq", equipmentId).query((rs, row) -> 1).single();
         try {
             Long id = jdbc.sql("""
                             INSERT INTO bookings (equipment_id, renter_id, period, total_cents)
