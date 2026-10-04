@@ -1,0 +1,32 @@
+# Requires ingress-nginx and cert-manager (Let's Encrypt) in the cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quipmarket
+  namespace: quipmarket
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 128k
+    # GraphQL subscriptions use long-lived WebSockets.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [quipmarket.example.com, api.quipmarket.example.com]
+      secretName: quipmarket-tls
+  rules:
+    - host: quipmarket.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: frontend, port: { name: http } }
+    - host: api.quipmarket.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: backend, port: { name: http } }

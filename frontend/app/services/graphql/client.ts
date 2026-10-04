@@ -22,8 +22,10 @@ export function newIdempotencyKey(): string {
 export interface GraphQlConfig {
   httpUrl: string
   wsUrl: string
-  /** Phase 2 demo identity, sent as X-User-Id. Phase 4: Auth0 bearer token. */
-  userId: () => string | null
+  /** Identity headers per request: Authorization: Bearer (auth0) or X-User-Id / X-User-Roles (demo). */
+  authHeaders: () => Promise<Record<string, string>>
+  /** Sent in the WebSocket connection_init payload: { authToken } (auth0) or { userId } (demo). */
+  connectionParams: () => Promise<Record<string, unknown>>
 }
 
 export function createGraphQlClient(config: GraphQlConfig) {
@@ -32,11 +34,11 @@ export function createGraphQlClient(config: GraphQlConfig) {
     variables: Record<string, unknown> = {},
     extraHeaders: Record<string, string> = {},
   ): Promise<T> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders }
-    const user = config.userId()
-    if (user) headers['X-User-Id'] = user
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(await config.authHeaders()), ...extraHeaders }
 
     const res = await fetch(config.httpUrl, { method: 'POST', headers, body: JSON.stringify({ query, variables }) })
+    if (res.status === 429) throw new GraphQlError('Too many requests. Please slow down.', 'RATE_LIMITED')
+    if (res.status === 401) throw new GraphQlError('Your session expired. Please log in again.', 'UNAUTHENTICATED')
     if (!res.ok) throw new GraphQlError(`HTTP ${res.status}`, 'HTTP_ERROR')
     const body = (await res.json()) as { data?: T; errors?: { message: string; extensions?: { code?: string } }[] }
     if (body.errors?.length) {
@@ -50,7 +52,7 @@ export function createGraphQlClient(config: GraphQlConfig) {
   function subscribe<T>(query: string, variables: Record<string, unknown>, onData: (data: T) => void): () => void {
     ws ??= createClient({
       url: config.wsUrl,
-      connectionParams: () => ({ userId: config.userId() }),
+      connectionParams: config.connectionParams,
       retryAttempts: Infinity,
       shouldRetry: () => true,
     })

@@ -17,7 +17,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Demo profile only. Keeps a public demo alive:
@@ -53,10 +52,13 @@ class DemoAuctions implements ApplicationRunner {
     private final JdbcClient jdbc;
     private final Clock clock;
     private final boolean botsEnabled;
+    private final org.springframework.transaction.support.TransactionTemplate tx;
     private final Random random = new Random();
 
     DemoAuctions(AuctionService auctions, JdbcClient jdbc, Clock clock,
-                 @Value("${quipmarket.demo.bots-enabled:false}") boolean botsEnabled) {
+                 @Value("${quipmarket.demo.bots-enabled:false}") boolean botsEnabled,
+                 org.springframework.transaction.PlatformTransactionManager txManager) {
+        this.tx = new org.springframework.transaction.support.TransactionTemplate(txManager);
         this.auctions = auctions;
         this.jdbc = jdbc;
         this.clock = clock;
@@ -68,10 +70,20 @@ class DemoAuctions implements ApplicationRunner {
         reseedIfIdle();
     }
 
+    /**
+     * NOT annotated @Transactional on purpose: run() calls this method on `this`, which bypasses Spring's
+     * proxy (self-invocation), so the annotation would silently do nothing. An explicit TransactionTemplate
+     * works no matter who calls.
+     */
     @Scheduled(fixedDelay = 300_000, initialDelay = 300_000)
-    @Transactional
     public void reseedIfIdle() {
-        if (!auctions.list(AuctionState.Status.LIVE).isEmpty()) return;
+        tx.executeWithoutResult(status -> reseedInTransaction());
+    }
+
+    private void reseedInTransaction() {
+        // With several replicas, only the one holding this transaction-scoped advisory lock seeds.
+        boolean leader = Boolean.TRUE.equals(jdbc.sql("SELECT pg_try_advisory_xact_lock(7002)").query(Boolean.class).single());
+        if (!leader || !auctions.list(AuctionState.Status.LIVE).isEmpty()) return;
         log.info("No live auctions: seeding demo lots relative to now");
         // Remove only lots that are fully finished: ended + settled (holds released) and without an escrow deal,
         // plus upcoming lots nobody registered for. Lots with money in escrow are kept for the ledger history.

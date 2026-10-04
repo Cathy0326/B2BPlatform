@@ -6,7 +6,8 @@ Conventions
 - Time: DateTime = ISO-8601 instant in UTC ("2026-10-04T08:30:00Z"); Date = calendar day ("2026-10-04").
 - Expected business outcomes (a bid that is too low) come back as DATA (BidResult.accepted=false).
   Unexpected or invalid requests (unknown id, overlapping booking) come back as GraphQL ERRORS
-  with extensions.code, e.g. BOOKING_CONFLICT, NOT_REGISTERED, NOT_FOUND, UNAUTHENTICATED.
+  with extensions.code, e.g. BOOKING_CONFLICT, NOT_REGISTERED, NOT_FOUND, UNAUTHENTICATED, FORBIDDEN, RATE_LIMITED.
+- Auth: "Authorization: Bearer <Auth0 JWT>" in auth0 mode; X-User-Id / X-User-Roles headers in demo mode.
 """
 scalar Long
 scalar DateTime
@@ -26,17 +27,19 @@ type Query {
     rentalQuote(equipmentId: ID!, start: Date!, end: Date!): RentalQuote!
     loanQuote(input: LoanInput!): LoanQuote!
 
+    "The caller's public (pseudonymous) id and roles; null when anonymous."
+    me: Me
     "Which payment provider is active, and the Stripe publishable key for Stripe Elements (if any)."
     paymentConfig: PaymentConfig!
     "Escrow deals where the caller is the buyer."
     myDeals: [EscrowDeal!]!
     deal(id: ID!): EscrowDeal
 
-    "Every ledger account with its debit/credit totals. Total debits must equal total credits."
+    "Every ledger account with its debit/credit totals. Total debits must equal total credits. ADMIN only."
     trialBalance: TrialBalance!
     journalEntries(reference: String, last: Int = 50): [JournalEntry!]!
     auditLog(last: Int = 50): [AuditRecord!]!
-    "Recomputes the audit hash chain and reports the first broken record, if any."
+    "Recomputes the audit hash chain and reports the first broken record, if any. ADMIN only."
     verifyAuditChain: AuditVerification!
 }
 
@@ -59,7 +62,7 @@ type Mutation {
     payBalance(dealId: ID!, paymentMethodId: String): EscrowDeal!
     "Buyer accepts the machine: escrow is released to the seller minus the platform fee."
     confirmDelivery(dealId: ID!): EscrowDeal!
-    "Settle an ended auction now instead of waiting for the background job (demo / operations)."
+    "Settle an ended auction now instead of waiting for the background job. ADMIN only."
     settleAuction(auctionId: ID!): EscrowDeal
 }
 
@@ -208,6 +211,14 @@ type Registration {
     paymentStatus: PaymentStatus
     "Only set while the payer must complete 3-D Secure in the browser (Stripe.js handleNextAction)."
     clientSecret: String
+}
+
+# ---------- identity ----------
+
+type Me {
+    "Public pseudonymous id used in bid histories (never the email or Auth0 subject)."
+    id: ID!
+    roles: [String!]!
 }
 
 # ---------- payments ----------

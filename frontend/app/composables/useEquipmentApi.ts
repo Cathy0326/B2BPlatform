@@ -23,10 +23,23 @@ function graphQl(): GraphQlClient | null {
   const config = useRuntimeConfig().public
   if (!config.graphqlUrl) return null
   if (import.meta.client && gql) return gql
-  const httpUrl = config.graphqlUrl as string
+  const serverUrl = import.meta.server ? (useRuntimeConfig().graphqlUrlServer as string) : ''
+  const httpUrl = serverUrl || (config.graphqlUrl as string)
   const wsUrl = (config.graphqlWsUrl as string) || httpUrl.replace(/^http/, 'ws').replace(/\/graphql$/, '/graphql-ws')
   const user = useCurrentUser()
-  const client = createGraphQlClient({ httpUrl, wsUrl, userId: () => user.value.id })
+  const auth0 = useAuthMode() === 'auth0'
+  const client = createGraphQlClient({
+    httpUrl,
+    wsUrl,
+    authHeaders: async (): Promise<Record<string, string>> => {
+      if (auth0) {
+        const token = await getAccessToken()
+        return token ? { Authorization: `Bearer ${token}` } : {}
+      }
+      return user.value.id ? { 'X-User-Id': user.value.id, 'X-User-Roles': user.value.roles.join(',') } : {}
+    },
+    connectionParams: async () => (auth0 ? { authToken: await getAccessToken() } : { userId: user.value.id }),
+  })
   // Cache only in the browser. On the server every request gets its own client, so one
   // visitor's identity can never leak into another visitor's SSR request.
   if (import.meta.client) gql = client

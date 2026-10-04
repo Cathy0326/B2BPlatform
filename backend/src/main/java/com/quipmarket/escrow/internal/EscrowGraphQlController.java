@@ -63,9 +63,11 @@ class EscrowGraphQlController {
         return escrow.confirmDelivery(dealId, CurrentUser.require(userId));
     }
 
-    /** Demo/ops trigger: settle an ended auction now instead of waiting for the job. (Phase 4: ADMIN only.) */
+    /** Ops trigger: settle an ended auction now instead of waiting for the job. ADMIN only. */
     @MutationMapping
-    EscrowDeal settleAuction(@Argument String auctionId) {
+    EscrowDeal settleAuction(@Argument String auctionId, @ContextValue(name = CurrentUser.CONTEXT_KEY, required = false) String userId,
+            @ContextValue(name = CurrentUser.ROLES_KEY, required = false) List<String> roles) {
+        CurrentUser.requireAdmin(userId, roles);
         return escrow.settle(auctionId).orElseGet(() -> escrow.find("deal-" + auctionId).orElse(null));
     }
 

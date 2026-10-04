@@ -4,8 +4,13 @@ import { createEscrowApi } from '~/services/graphql/escrowApi'
 useSeoMeta({ title: 'Ledger & audit trail' })
 
 const gql = useGraphQlClient()
+const isAdmin = useIsAdmin()
 const api = gql ? createEscrowApi(gql) : null
-const { data, status, refresh } = useAsyncData('ledger', async () => (api ? api.ledgerOverview() : null), { server: false })
+// The API also enforces this (FORBIDDEN): hiding the page is UX, the server check is security.
+const { data, status, refresh } = useAsyncData('ledger', async () => (api && isAdmin.value ? api.ledgerOverview() : null), {
+  server: false,
+  watch: [isAdmin],
+})
 
 const typeOrder = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']
 const accounts = computed(() =>
@@ -27,6 +32,9 @@ const short = (h: string) => `${h.slice(0, 10)}…`
     <div v-if="!api" class="card">
       <p>The ledger lives in the backend. Start the Spring Boot API and set <code>NUXT_PUBLIC_GRAPHQL_URL</code>.</p>
       <NuxtLink to="/escrow">See a worked example →</NuxtLink>
+    </div>
+    <div v-else-if="!isAdmin" class="card">
+      <p><strong>Administrator role required.</strong> The ledger shows every customer's money.</p>
     </div>
     <p v-else-if="(status === 'idle' || status === 'pending') && !data" class="muted">Loading ledger…</p>
 

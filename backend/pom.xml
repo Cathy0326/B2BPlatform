@@ -73,9 +73,19 @@
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
     <dependency>
+      <!-- compile scope: the LISTEN/NOTIFY listener uses org.postgresql.PGConnection -->
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
+    </dependency>
+
+    <!-- Security: Auth0 (OAuth2 resource server, JWT) in "auth0" mode; open demo mode otherwise -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
     </dependency>
 
     <!-- Payments: Stripe (test mode) behind the PaymentGateway interface -->
@@ -105,6 +115,11 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: quipmarket
+  labels: { app: frontend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000      # the "node" user in node:22-alpine
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: frontend
+          image: ghcr.io/cathy0326/quipmarket-frontend:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef: { name: frontend-config }   # no Secret: the frontend never needs backend credentials
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: quipmarket
+spec:
+  selector: { app: frontend }
+  ports:
+    - { name: http, port: 3000, targetPort: http }

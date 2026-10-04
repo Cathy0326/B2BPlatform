@@ -25,6 +25,7 @@ import org.springframework.test.context.TestPropertySource;
         "spring.flyway.locations=classpath:db/migration,classpath:db/demo",
         "quipmarket.escrow.jobs-enabled=false",          // tests drive settlement explicitly
         "quipmarket.payments.gateway=simulated",
+        "quipmarket.rate-limit.enabled=false",           // covered by RateLimitFilterTest
         "quipmarket.stripe.webhook-secret=" + IntegrationTest.WEBHOOK_SECRET
 })
 public @interface IntegrationTest {

@@ -6,6 +6,8 @@ import { createEscrowApi } from '~/services/graphql/escrowApi'
 useSeoMeta({ title: 'My escrow deals' })
 
 const gql = useGraphQlClient()
+const currentUser = useCurrentUser()
+const { login } = useAuth()
 const api = gql ? createEscrowApi(gql) : null
 const { data: paymentConfig } = usePaymentConfig()
 
@@ -58,6 +60,10 @@ onBeforeUnmount(() => clearInterval(poll))
     <div v-if="!api" class="card">
       <p>Escrow needs the backend. Start the Spring Boot API and set <code>NUXT_PUBLIC_GRAPHQL_URL</code>.</p>
       <NuxtLink to="/escrow">How escrow works →</NuxtLink>
+    </div>
+    <div v-else-if="!currentUser.authenticated" class="card">
+      <p>Log in to see the auctions you won.</p>
+      <button class="btn btn-primary" @click="login()">Log in</button>
     </div>
     <p v-else-if="(status === 'idle' || status === 'pending') && !deals.length" class="muted">Loading deals…</p>
     <div v-else-if="!deals.length" class="card">

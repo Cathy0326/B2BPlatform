@@ -24,6 +24,11 @@ spring:
       allowed-headers: "*"
 
 quipmarket:
+  # demo = X-User-Id header, no login (local/demo only). auth0 = validate Auth0 JWTs.
+  auth:
+    mode: ${AUTH_MODE:demo}
+    issuer: ${AUTH0_ISSUER:}        # e.g. https://your-tenant.us.auth0.com/
+    audience: ${AUTH0_AUDIENCE:}    # the API Identifier you create in Auth0, e.g. https://api.quipmarket.dev
   # Payment provider: simulated (default; no keys needed) or stripe (test mode only).
   payments:
     gateway: ${PAYMENTS_GATEWAY:simulated}

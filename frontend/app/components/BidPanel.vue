@@ -17,6 +17,8 @@ const props = defineProps<{
   stripeKey: string | null
 }>()
 const emit = defineEmits<{ register: [paymentMethodId: string | null]; confirm: []; bid: [maxCents: number] }>()
+const currentUser = useCurrentUser()
+const { login } = useAuth()
 
 const picker = ref<{ getPaymentMethodId(): Promise<string>; handleNextAction(secret: string): Promise<boolean> } | null>(null)
 const pickerError = ref<string | null>(null)
@@ -63,7 +65,11 @@ function submit() {
 
 <template>
   <div class="bid-panel stack">
-    <template v-if="status === 'LIVE'">
+    <template v-if="status === 'LIVE' && !currentUser.authenticated">
+      <p class="muted">Log in to place a deposit hold and bid.</p>
+      <button class="btn btn-primary btn-block" @click="login()">Log in to bid</button>
+    </template>
+    <template v-else-if="status === 'LIVE'">
       <div v-if="!hold || hold.status === 'PENDING'" class="stack">
         <p class="muted">
           To bid, place a <strong>refundable deposit hold</strong> of

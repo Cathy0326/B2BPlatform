@@ -14,7 +14,6 @@ import com.quipmarket.payments.PaymentStatusChanged;
 import com.quipmarket.payments.Payments;
 import com.quipmarket.shared.DomainException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -26,10 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
 @Service
 class DefaultAuctionService implements AuctionService {
@@ -39,10 +35,11 @@ class DefaultAuctionService implements AuctionService {
     private final Payments payments;
     private final AuditTrail audit;
     private final TransactionTemplate tx;
-    /** In-process event bus for subscriptions. (Multi-instance: swap for Postgres LISTEN/NOTIFY or Redis pub/sub.) */
-    private final Sinks.Many<String> changes = Sinks.many().multicast().directBestEffort();
+    private final AuctionChangeNotifier notifier;
 
-    DefaultAuctionService(AuctionRepository repo, Clock clock, Payments payments, AuditTrail audit, PlatformTransactionManager txManager) {
+    DefaultAuctionService(AuctionRepository repo, Clock clock, Payments payments, AuditTrail audit, PlatformTransactionManager txManager,
+                          AuctionChangeNotifier notifier) {
+        this.notifier = notifier;
         this.repo = repo;
         this.clock = clock;
         this.payments = payments;
@@ -179,7 +176,7 @@ class DefaultAuctionService implements AuctionService {
      *   2. check the deposit hold
      *   3. run the pure engine
      *   4. persist new state + visible bids + the raw submission (audit)
-     *   5. after COMMIT, notify subscribers (never announce a bid that might still roll back)
+     *   5. pg_notify, delivered to every replica's subscribers only when this transaction COMMITS
      */
     @Override
     @Transactional
@@ -217,7 +214,7 @@ class DefaultAuctionService implements AuctionService {
 
     @Override
     public Flux<String> changes() {
-        return changes.asFlux();
+        return notifier.changes();
     }
 
     private AuctionView view(String auctionId, Instant now) {
@@ -225,13 +222,8 @@ class DefaultAuctionService implements AuctionService {
         return AuctionView.of(row.state(), row.bidCount(), now);
     }
 
+    /** pg_notify inside the transaction: PostgreSQL delivers it to every replica only if we COMMIT. */
     private void publishAfterCommit(String auctionId) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                // busyLooping handles concurrent emitters (Sinks require serialized emission).
-                changes.emitNext(auctionId, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
-            }
-        });
+        notifier.publish(auctionId);
     }
 }

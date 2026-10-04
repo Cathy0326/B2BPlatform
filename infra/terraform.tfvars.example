@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Tokens are better passed as environment variables:
+#   $env:TF_VAR_linode_token = "..."; $env:TF_VAR_cloudflare_api_token = "..."
+cloudflare_zone_id = "your-zone-id"
+domain             = "quipmarket.example.com"
+region             = "eu-central"
+db_allow_list      = []
+ingress_ip         = ""
