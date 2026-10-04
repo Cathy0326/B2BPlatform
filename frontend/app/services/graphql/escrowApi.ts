@@ -1,4 +1,5 @@
-import type { AuditRecord, AuditVerification, EscrowDeal, JournalEntry, PaymentConfig, TrialBalance } from '~/types/escrow'
+import type { EscrowDeal, PaymentConfig } from '~/types/escrow'
+import type { EscrowApi, LedgerOverview } from '~/services/escrowApi'
 import { newIdempotencyKey, type GraphQlClient } from './client'
 
 const JOURNAL = 'id kind reference description createdAt lines { accountCode debitCents creditCents }'
@@ -10,8 +11,8 @@ const DEAL = `
   journal { ${JOURNAL} } createdAt updatedAt
 `
 
-/** Phase 3 operations: escrow, ledger, audit. Backend only (there is no mock for money movement). */
-export function createEscrowApi(gql: GraphQlClient) {
+/** Phase 3 operations: escrow, ledger, audit, served by the Spring Boot API. */
+export function createEscrowApi(gql: GraphQlClient): EscrowApi {
   return {
     async paymentConfig() {
       return (await gql.request<{ paymentConfig: PaymentConfig }>('{ paymentConfig { gateway stripePublishableKey } }')).paymentConfig
@@ -36,7 +37,7 @@ export function createEscrowApi(gql: GraphQlClient) {
       return data.confirmDelivery
     },
     async ledgerOverview() {
-      return gql.request<{ trialBalance: TrialBalance; journalEntries: JournalEntry[]; auditLog: AuditRecord[]; verifyAuditChain: AuditVerification }>(`{
+      return gql.request<LedgerOverview>(`{
         trialBalance { accounts { code type name debitsCents creditsCents balanceCents } totalDebitsCents totalCreditsCents balanced }
         journalEntries(last: 25) { ${JOURNAL} }
         auditLog(last: 15) { seq eventType subject actor payload createdAt prevHash hash }

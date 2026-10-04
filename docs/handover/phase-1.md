@@ -49,7 +49,7 @@ npm install          # also runs `nuxt prepare`, which generates .nuxt/ types
 
 **Step 4 (optional) — Deploy to Cloudflare (Workers, free)**
 
-The site runs in mock mode, so no backend is needed. `frontend/wrangler.jsonc` holds the Worker config.
+The site runs in mock mode, so no backend is needed: auctions, escrow deals, the ledger and the audit chain are simulated in the visitor's browser with the same rules as the backend (`services/escrowApi.ts`). `frontend/wrangler.jsonc` holds the Worker config.
 
 1. Cloudflare dashboard → *Workers & Pages* → *Create application* → *Import a repository* → connect GitHub → pick `B2BPlatform`.
 2. Fill in *Set up your application*:
@@ -62,13 +62,38 @@ The site runs in mock mode, so no backend is needed. `frontend/wrangler.jsonc` h
    | Preview command | keep the default (`npx wrangler preview`) |
    | Advanced settings → Path | `frontend` |
    | API token | keep *Create new token* |
-   | Variables | none for mock mode |
+   | Variables | none (add the Auth0 ones below later, if you want real login) |
 
 3. Click *Deploy*. You get a free `https://quipmarket.<your-subdomain>.workers.dev` URL; put it in your Upwork proposal.
 
 Test the same build locally: `cd frontend && npm run build:cloudflare && npx wrangler dev` → http://localhost:8787.
 On Windows PowerShell, run `$env:NITRO_PRESET='cloudflare_module'; npx nuxt build` instead of `npm run build:cloudflare`.
 `npm run build` (without `:cloudflare`) still produces the Node server used by the Docker image.
+
+**Step 5 (optional) — Real Auth0 login on the live demo (free plan)**
+
+Without these variables the site uses a built-in "Demo buyer". With them, visitors log in through Auth0 (Authorization Code + PKCE). Because the demo has no backend, the browser derives a pseudonymous id from the Auth0 subject and grants the demo admin role, which is safe only because all demo data lives in the visitor's own browser.
+
+1. Sign up at auth0.com (free) and create a tenant, for example `quipmarket-demo`.
+2. *Applications → APIs → Create API*: name `QuipMarket API`, identifier `https://api.quipmarket.dev` (this is the audience; it never has to resolve). In its *Settings*, turn on **Allow Offline Access** (the SPA uses refresh tokens).
+3. *Applications → Applications → Create Application*: name `QuipMarket demo`, type **Single Page Web Applications**. In *Settings*, set all three of these to `https://quipmarket.<your-subdomain>.workers.dev, http://localhost:3000`:
+   - Allowed Callback URLs
+   - Allowed Logout URLs
+   - Allowed Web Origins
+
+   Save. Under *Refresh Token Rotation*, turn rotation on.
+4. Cloudflare dashboard → *Workers & Pages* → `quipmarket` → *Settings* → *Variables and Secrets* → add three **Text** variables:
+
+   | Name | Value |
+   |---|---|
+   | `NUXT_PUBLIC_AUTH0_DOMAIN` | your tenant domain, e.g. `quipmarket-demo.us.auth0.com` (no `https://`) |
+   | `NUXT_PUBLIC_AUTH0_CLIENT_ID` | the application's *Client ID* |
+   | `NUXT_PUBLIC_AUTH0_AUDIENCE` | `https://api.quipmarket.dev` |
+
+   These are public values (they end up in the browser), so *Text* is correct; there is no client secret in a SPA. Saving deploys a new version; no rebuild is needed.
+5. Open the site → *Log in* → sign up with any email → you return as yourself with your own demo deals.
+
+To go back to the demo buyer, delete the three variables.
 
 ---
 

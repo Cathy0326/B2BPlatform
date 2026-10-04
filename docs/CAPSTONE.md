@@ -44,7 +44,7 @@
 
 **By the numbers:** about 4,300 lines of Java, 1,600 lines of Java tests, 5,000 lines of TypeScript/Vue, and 300 lines of SQL.
 - Backend: **82 tests** (41 unit + 41 integration against a real PostgreSQL).
-- Frontend: **57 unit tests**.
+- Frontend: **81 unit tests**.
 - **4 phases** with a handover doc each.
 
 ---

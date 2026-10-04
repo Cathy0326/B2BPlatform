@@ -3,6 +3,8 @@ import { createMockEquipmentApi, type EquipmentApi } from '~/services/equipmentA
 import { createGraphQlClient, type GraphQlClient } from '~/services/graphql/client'
 import { createGraphQlAuctionApi } from '~/services/graphql/auctionApi'
 import { createGraphQlEquipmentApi } from '~/services/graphql/equipmentApi'
+import { createMockEscrowApi, type EscrowApi } from '~/services/escrowApi'
+import { createEscrowApi } from '~/services/graphql/escrowApi'
 
 /**
  * Picks the data source ONCE, based on runtime config:
@@ -13,6 +15,7 @@ import { createGraphQlEquipmentApi } from '~/services/graphql/equipmentApi'
 let gql: GraphQlClient | null = null
 let mockEquipment: EquipmentApi | null = null
 let mockAuctions: AuctionApi | null = null
+let mockEscrow: EscrowApi | null = null
 
 /** The GraphQL client, or null in mock mode. */
 export function useGraphQlClient(): GraphQlClient | null {
@@ -58,6 +61,18 @@ export function useAuctionApi(): AuctionApi {
   if (client) return createGraphQlAuctionApi(client)
   mockAuctions ??= createMockAuctionApi()
   return mockAuctions
+}
+
+/**
+ * Escrow, ledger and audit. Mock mode runs the same state machine and double-entry rules in the browser
+ * and settles auctions won in the mock auction room, so it must share that room's AuctionApi instance.
+ */
+export function useEscrowApi(): EscrowApi {
+  const client = graphQl()
+  if (client) return createEscrowApi(client)
+  const user = useCurrentUser()
+  mockEscrow ??= createMockEscrowApi({ currentUserId: () => user.value.id, auctions: useAuctionApi() })
+  return mockEscrow
 }
 
 export function useDataSourceLabel(): 'mock' | 'graphql' {
