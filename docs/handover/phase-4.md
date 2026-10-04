@@ -77,8 +77,8 @@ $env:TF_VAR_linode_token = "..."; $env:TF_VAR_cloudflare_api_token = "..."
 copy terraform.tfvars.example terraform.tfvars   # fill in zone id + domain
 tofu init; tofu apply                            # LKE cluster + managed PostgreSQL (~$50-70/month; destroy after the demo!)
 tofu output -raw kubeconfig | base64 -d > $HOME\.kube\quipmarket.yaml
-# install ingress-nginx + cert-manager (Helm), create the backend-secrets Secret (k8s/secret.example.yaml.txt), then:
-kubectl apply -k ..\k8s
+# install ingress-nginx + cert-manager (Helm), create the backend-secrets Secret (k8s/base/secret.example.yaml.txt), then:
+kubectl apply -k ..\k8s\base
 tofu destroy                                     # when done
 ```
 > The Linode Postgres `allow_list` must include your LKE node IPs, otherwise the backend can't connect.
@@ -137,7 +137,8 @@ Measured in the container: a burst of 150 mutations from one user → 13 accepte
 ```
 push / PR ─┬─ frontend:        npm ci → typecheck → 57 unit tests → build
            ├─ backend:         mvnw verify (41 unit + 41 Testcontainers integration tests)
-           └─ infrastructure:  kubeconform (k8s schemas) + tofu fmt/validate
+           ├─ infrastructure:  kubeconform (k8s schemas) + tofu fmt/validate
+           └─ kubernetes:      build both images → kind cluster → kubectl apply -k k8s/overlays/ci → smoke-test.sh
                          │
                   frontend + backend green
                          ▼
@@ -162,7 +163,8 @@ push / PR ─┬─ frontend:        npm ci → typecheck → 57 unit tests → 
 | `backend/Dockerfile`, `frontend/Dockerfile` | Multi-stage, layered, non-root images | ⭐⭐ |
 | `compose.yaml` | DB only, or the full stack with `--profile app` | ⭐ |
 | `.github/workflows/ci.yml` | CI/CD | ⭐⭐ |
-| `k8s/*.yaml` | Deployments, probes, PDB, ingress, least-privilege config | ⭐⭐ |
+| `k8s/base/*.yaml` | Deployments, probes, PDB, ingress, least-privilege config | ⭐⭐ |
+| `k8s/overlays/ci/` | The same manifests deployed to a throwaway kind cluster in CI, plus in-cluster PostgreSQL | ⭐⭐ |
 | `infra/*.tf` | OpenTofu: LKE, managed PostgreSQL, Cloudflare DNS | ⭐ |
 
 ---

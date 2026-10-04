@@ -246,6 +246,8 @@ One `PaymentGateway` interface; Spring picks the implementation with `@Condition
 
 ---
 
+The frontend uses the same idea: `EscrowApi` (`frontend/app/services/escrowApi.ts`) has a GraphQL implementation and an in-browser demo implementation. The demo runs the same state machine, journal entries, 5% fee rule and SHA-256 audit chain, so the live demo works without a backend, and `tests/escrowDemo.test.ts` checks that it keeps the books balanced.
+
 ## 5. Real bugs found while building
 
 | # | What happened | Root cause | Fix | Lesson |
