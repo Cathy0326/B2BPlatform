@@ -72,6 +72,26 @@ def jacoco(path):
     }
 
 
+def gates(root):
+    """Coverage floors, read from the build files themselves so the report can never disagree with the gate."""
+    import re
+    out = {}
+    pom = os.path.join(root, "backend/pom.xml")
+    if os.path.exists(pom):
+        text = open(pom).read()
+        for counter, key in (("LINE", "lines"), ("BRANCH", "branches")):
+            m = re.search(rf"<counter>{counter}</counter><value>COVEREDRATIO</value><minimum>([0-9.]+)</minimum>", text)
+            if m:
+                out[("backend", key)] = float(m.group(1)) * 100
+    cfg = os.path.join(root, "frontend/vitest.config.ts")
+    if os.path.exists(cfg):
+        m = re.search(r"thresholds:\s*\{([^}]*)\}", open(cfg).read())
+        if m:
+            for key, value in re.findall(r"(\w+):\s*([0-9.]+)", m.group(1)):
+                out[("frontend", key)] = float(value)
+    return out
+
+
 def vitest(path):
     t = json.load(open(path))["total"]
     return {"lines": t["lines"]["pct"], "branches": t["branches"]["pct"],
@@ -113,14 +133,20 @@ def main():
     if failures:
         out += ["", "**Failing tests:**", ""] + [f"- `{f}`" for f in failures]
 
-    out += ["", "### Code coverage", "", "| Scope | Lines | Branches |", "|---|---|---|"]
+    floors = gates(args.root)
+    out += ["", "### Code coverage", "", "| Scope | Lines | Branches | Gate (CI fails below) |", "|---|---|---|---|"]
     backend = jacoco(at("backend/target/site/jacoco/jacoco.csv")) if os.path.exists(at("backend/target/site/jacoco/jacoco.csv")) else None
     frontend = vitest(at("frontend/reports/coverage/coverage-summary.json")) if os.path.exists(at("frontend/reports/coverage/coverage-summary.json")) else None
-    for name, c in [("Backend, all code (JaCoCo, unit + integration)", backend), ("Frontend logic: utils + services (Vitest v8)", frontend)]:
+    for side, name, c in [("backend", "Backend, all code (JaCoCo, unit + integration)", backend),
+                          ("frontend", "Frontend logic: utils + services (Vitest v8)", frontend)]:
+        floor_l, floor_b = floors.get((side, "lines")), floors.get((side, "branches"))
+        gate = f"lines ≥ {floor_l:.0f}%, branches ≥ {floor_b:.0f}%" if floor_l and floor_b else "none"
         if c is None:
-            out.append(f"| {name} | report not found | |")
+            out.append(f"| {name} | report not found | | {gate} |")
         else:
-            out.append(f"| {name} | `{bar(c['lines'])}` **{c['lines']:.1f}%** ({c['line_counts'][0]}/{c['line_counts'][1]}) | {c['branches']:.1f}% |")
+            ok = (floor_l is None or c["lines"] >= floor_l) and (floor_b is None or c["branches"] >= floor_b)
+            out.append(f"| {name} | `{bar(c['lines'])}` **{c['lines']:.1f}%** ({c['line_counts'][0]}/{c['line_counts'][1]}) "
+                       f"| {c['branches']:.1f}% | {'✅' if ok else '❌'} {gate} |")
     if backend:
         out += ["", "<details><summary>Backend line coverage by module</summary>", "", "| Module | Lines | |", "|---|---:|---|"]
         for name, (p, c, t) in sorted(backend["modules"].items(), key=lambda kv: -kv[1][0]):

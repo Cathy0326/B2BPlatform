@@ -53,11 +53,19 @@ class DemoAuctions implements ApplicationRunner {
     private final Clock clock;
     private final boolean botsEnabled;
     private final org.springframework.transaction.support.TransactionTemplate tx;
-    private final Random random = new Random();
+    private final Random random;
 
+    @org.springframework.beans.factory.annotation.Autowired
     DemoAuctions(AuctionService auctions, JdbcClient jdbc, Clock clock,
                  @Value("${quipmarket.demo.bots-enabled:false}") boolean botsEnabled,
                  org.springframework.transaction.PlatformTransactionManager txManager) {
+        this(auctions, jdbc, clock, botsEnabled, txManager, new Random());
+    }
+
+    /** Tests pass a predictable Random so bot behaviour is reproducible. */
+    DemoAuctions(AuctionService auctions, JdbcClient jdbc, Clock clock, boolean botsEnabled,
+                 org.springframework.transaction.PlatformTransactionManager txManager, Random random) {
+        this.random = random;
         this.tx = new org.springframework.transaction.support.TransactionTemplate(txManager);
         this.auctions = auctions;
         this.jdbc = jdbc;
