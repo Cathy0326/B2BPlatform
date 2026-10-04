@@ -12,8 +12,10 @@ output "db_port" {
   value = linode_database_postgresql_v2.main.port
 }
 
+# The provider marks the username sensitive; read it with: tofu output -raw db_username
 output "db_username" {
-  value = linode_database_postgresql_v2.main.root_username
+  value     = linode_database_postgresql_v2.main.root_username
+  sensitive = true
 }
 
 output "db_password" {
