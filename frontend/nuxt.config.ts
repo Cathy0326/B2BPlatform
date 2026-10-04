@@ -8,11 +8,11 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'en' },
-      title: 'QuipFinance',
-      titleTemplate: '%s · QuipFinance',
+      title: 'QuipMarket',
+      titleTemplate: '%s · QuipMarket',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'description', content: 'Buy, sell, rent, and finance heavy equipment.' },
+        { name: 'description', content: 'Buy, rent, and bid on heavy equipment with escrow-protected payments.' },
         { name: 'theme-color', content: '#111827' },
       ],
       link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
