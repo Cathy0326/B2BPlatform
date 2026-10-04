@@ -1,15 +1,14 @@
 # Phase 2 Handover: Spring Boot GraphQL Backend + PostgreSQL
-# 第二阶段交接文档：Spring Boot GraphQL 后端 + PostgreSQL
 
-> **Status / 状态:** ✅ Complete · 29 unit tests + 12 integration tests (real PostgreSQL via Testcontainers) · module boundaries verified · frontend connected end to end (HTTP + WebSocket) · checked in Chromium
+> **Status:** ✅ Complete · 29 unit tests + 12 integration tests (real PostgreSQL via Testcontainers) · module boundaries verified · frontend connected end to end (HTTP + WebSocket) · checked in Chromium
 >
-> **Folders / 目录:** `backend/` (new), `frontend/app/services/graphql/` (new), `compose.yaml` (new)
+> **Folders:** `backend/` (new), `frontend/app/services/graphql/` (new), `compose.yaml` (new)
 
 ---
 
 ## 0. TL;DR
 
-**English:** The auction engine, rentals, catalog and financing now run on a **Java 21 / Spring Boot 4.1 / Spring for GraphQL** server backed by **PostgreSQL 16 + Flyway**. Correctness under concurrency is guaranteed by the **database**, and proven by tests that fire 40–50 simultaneous requests:
+The auction engine, rentals, catalog and financing now run on a **Java 21 / Spring Boot 4.1 / Spring for GraphQL** server backed by **PostgreSQL 16 + Flyway**. Correctness under concurrency is guaranteed by the **database**, and proven by tests that fire 40–50 simultaneous requests:
 - **Double-booking is impossible:** a PostgreSQL `EXCLUDE` constraint rejects overlapping periods atomically.
 - **Bids can't overwrite each other:** each lot's row is locked (`SELECT … FOR UPDATE`) for the duration of a bid.
 - **No N+1:** `@BatchMapping` loads nested data in one query per type, and a test counts the SQL statements.
@@ -17,21 +16,13 @@
 
 The Nuxt app switches from mock data to the API with **one environment variable**, and no page changed.
 
-**中文：** 拍卖引擎、租赁、目录和贷款计算现在都跑在 **Java 21 + Spring Boot 4.1 + GraphQL** 服务端上，数据存进 **PostgreSQL**。并发下的正确性由**数据库**保证，并且用 40–50 个同时发出的请求测试过：
-- **不可能重复预订**：PostgreSQL 的 `EXCLUDE` 约束会原子地拒绝时间重叠的预订。
-- **出价不会互相覆盖**：一次出价期间，这场拍卖对应的数据行会被锁住（`SELECT … FOR UPDATE`）。
-- **没有 N+1 查询**：`@BatchMapping` 让每种嵌套数据只查一次，有测试数 SQL 语句条数。
-- **实时推送**：GraphQL 订阅通过 WebSocket，把每笔已提交的出价推给所有打开的浏览器。
-
-前端只要设置**一个环境变量**，就从 mock 数据切换到真实 API，页面代码一行没改。
-
 ![live auction](../screenshots/10-live-auction.png)
 
 ---
 
-## 1. How to run on Windows / 在 Windows 上运行
+## 1. How to run on Windows
 
-**Install once（只需安装一次）**
+**Install once**
 
 | Tool | Where | Check |
 |---|---|---|
@@ -39,9 +30,9 @@ The Nuxt app switches from mock data to the API with **one environment variable*
 | Docker Desktop | <https://www.docker.com/products/docker-desktop> | `docker version` |
 | Node 22 | (from Phase 1) | `node -v` |
 
-> Maven is **not** required: `mvnw.cmd` downloads the right version automatically. 不需要安装 Maven，`mvnw.cmd` 会自动下载。
+> Maven is **not** required: `mvnw.cmd` downloads the right version automatically.
 
-**Run the whole stack (3 terminals) / 启动全部服务（3 个终端）**
+**Run the whole stack (3 terminals)**
 
 ```powershell
 # Terminal 1 — database (from repo root)
@@ -59,14 +50,14 @@ $env:NUXT_PUBLIC_GRAPHQL_URL = "http://localhost:8080/graphql"
 npm run dev        # http://localhost:3000  → footer says "Data: live GraphQL API"
 ```
 
-**Tests / 测试**
+**Tests**
 
 | Command (in `backend/`) | Runs | Needs Docker? |
 |---|---|---|
 | `.\mvnw.cmd test` | 29 fast unit tests + module-boundary check | No |
 | `.\mvnw.cmd verify` | the above + 12 integration tests on a real PostgreSQL | **Yes** |
 
-**Try it in GraphiQL / 在 GraphiQL 里试一下** (Headers tab: `{"X-User-Id": "alice"}`)
+**Try it in GraphiQL** (Headers tab: `{"X-User-Id": "alice"}`)
 
 ```graphql
 mutation {
@@ -77,9 +68,9 @@ mutation {
 
 ---
 
-## 2. Big picture / 全局图 🗺️
+## 2. Big picture
 
-### 2.1 Modules (modular monolith) / 模块地图
+### 2.1 Modules (modular monolith)
 
 ```
             ┌──────────────────────────── one Spring Boot process ────────────────────────────┐
@@ -99,9 +90,9 @@ mutation {
                               PostgreSQL 16  (Flyway V1 catalog · V2 rentals · V3 auctions)
 ```
 
-**Why a modular monolith? / 为什么是模块化单体？** It's the architecture MassQuip uses. One deployable keeps operations simple, while enforced boundaries keep the code splittable into services later. 部署简单，同时边界清晰，以后要拆成微服务也容易。
+**Why a modular monolith?** It's the architecture MassQuip uses. One deployable keeps operations simple, while enforced boundaries keep the code splittable into services later.
 
-### 2.2 One bid, inside the server / 一次出价在服务端的流程
+### 2.2 One bid, inside the server
 
 ```
 placeBid(au-2001, alice, $250k)                         ── @Transactional ──────────────┐
@@ -119,9 +110,9 @@ placeBid(au-2001, alice, $250k)                         ── @Transactional �
                                                     re-reads the lot → pushes to browsers
 ```
 
-**Why publish AFTER commit? / 为什么提交之后才推送？** If we pushed before commit and the transaction rolled back, browsers would show a bid that never happened. 如果在提交前推送，而事务又回滚了，浏览器就会显示一笔根本不存在的出价。
+**Why publish AFTER commit?** If we pushed before commit and the transaction rolled back, browsers would show a bid that never happened.
 
-### 2.3 Lost update: what the lock prevents (proven by a test) / 丢失更新
+### 2.3 Lost update: what the lock prevents (proven by a test)
 
 ```
 WITHOUT the row lock                      WITH  SELECT … FOR UPDATE
@@ -133,9 +124,8 @@ T2: carol max 175k → leader=carol, write  T2: (now reads leader=bob 180k)
 ```
 
 I removed `FOR UPDATE` on purpose and re-ran `AuctionConcurrencyIT`. The test **failed** (`expected bidder-29 but was bidder-39`), which proves the test really detects the race. Then the lock was restored.
-我故意删掉 `FOR UPDATE` 重跑测试，测试**失败**了，证明这个测试真的能抓到竞态条件。之后锁已恢复。
 
-### 2.4 Double booking: why no Java lock is needed / 为什么防重复预订不需要 Java 锁
+### 2.4 Double booking: why no Java lock is needed
 
 ```sql
 CONSTRAINT bookings_no_overlap EXCLUDE USING gist (equipment_id WITH =, period WITH &&)
@@ -146,7 +136,7 @@ CONSTRAINT bookings_no_overlap EXCLUDE USING gist (equipment_id WITH =, period W
 
 `daterange(start, end, '[)')` is half-open, the same convention as the frontend, so back-to-back bookings are legal.
 
-### 2.5 N+1 → batching / 从 N+1 到批量查询
+### 2.5 N+1 → batching
 
 ```
 query { auctions { id equipment { title } } }
@@ -160,15 +150,15 @@ naive resolver:  SELECT auctions            (1)
 
 ---
 
-## 3. File map / 文件地图
+## 3. File map
 
-| File | Purpose 作用 | Read first? |
+| File | Purpose | Read first? |
 |---|---|---|
-| `backend/src/main/resources/graphql/schema.graphqls` | The API contract API 契约 | ⭐⭐⭐ |
-| `backend/src/main/resources/db/migration/V2__rentals.sql` | `EXCLUDE` constraint 防重复预订约束 | ⭐⭐⭐ |
+| `backend/src/main/resources/graphql/schema.graphqls` | The API contract | ⭐⭐⭐ |
+| `backend/src/main/resources/db/migration/V2__rentals.sql` | `EXCLUDE` constraint | ⭐⭐⭐ |
 | `backend/src/main/resources/db/migration/V3__auctions.sql` | Auction tables + CHECK invariants | ⭐⭐ |
-| `auction/AuctionEngine.java` | Proxy bidding rules (Java port, pure) 竞拍规则 | ⭐⭐⭐ |
-| `auction/internal/DefaultAuctionService.java` | Transaction, lock, publish after commit 事务和行锁 | ⭐⭐⭐ |
+| `auction/AuctionEngine.java` | Proxy bidding rules (Java port, pure) | ⭐⭐⭐ |
+| `auction/internal/DefaultAuctionService.java` | Transaction, lock, publish after commit | ⭐⭐⭐ |
 | `auction/internal/AuctionRepository.java` | SQL incl. `FOR UPDATE`, idempotent `ON CONFLICT DO NOTHING` | ⭐⭐ |
 | `auction/internal/AuctionGraphQlController.java` | Queries, mutations, subscription, `@BatchMapping`, secret-max resolver | ⭐⭐ |
 | `rental/internal/BookingRepository.java` | Insert + translate SQLSTATE `23P01` → `BOOKING_CONFLICT` | ⭐⭐ |
@@ -185,15 +175,15 @@ naive resolver:  SELECT auctions            (1)
 
 ---
 
-## 4. Key concepts, explained small / 核心概念（拆细讲）
+## 4. Key concepts, explained small
 
-### 4.1 `JdbcClient` (plain SQL) instead of JPA（为什么用纯 SQL 而不用 JPA）
+### 4.1 `JdbcClient` (plain SQL) instead of JPA
 - **What:** Spring 6's fluent SQL API with named parameters.
 - **Why here:** this system's correctness depends on **specific SQL**: `FOR UPDATE`, `EXCLUDE`, `ON CONFLICT DO NOTHING`, `DISTINCT ON`. With JPA these hide behind annotations and can be surprising (lazy loading → hidden N+1).
 - **Trade-off:** more code for mapping rows, but every query is visible and reviewable.
 - **Interview line:** *"For a money and inventory system I prefer explicit SQL, so locks and constraints are visible in code review."*
 
-### 4.2 Pessimistic lock vs optimistic lock（悲观锁 vs 乐观锁）
+### 4.2 Pessimistic lock vs optimistic lock
 
 | | Pessimistic `FOR UPDATE` (used for bids) | Optimistic `version` column |
 |---|---|---|
@@ -201,35 +191,34 @@ naive resolver:  SELECT auctions            (1)
 | Best when | **High contention** on one row (a hot auction in its last minute) | Low contention |
 | Cost | Waiting | Retries / failed requests |
 
-A hot lot has many bidders at once → pessimistic is simpler and fair. 拍卖最后几分钟同一行竞争激烈，用悲观锁更简单、也更公平。
+A hot lot has many bidders at once → pessimistic is simpler and fair.
 
-### 4.3 Why not a distributed lock (Redis / Redlock)?（为什么不用分布式锁）
+### 4.3 Why not a distributed lock (Redis / Redlock)?
 The database is already the single source of truth, and the row lock lives **in the same transaction** as the write. A Redis lock would be a second source of truth, and if it expires mid-transaction, two writers can still collide. **Rule:** lock where the data lives.
-数据库已经是唯一的事实来源，行锁和写操作在**同一个事务**里。再加 Redis 锁，就多了一个事实来源；万一锁在事务中途过期，两个写入方照样会冲突。原则：**数据在哪里，就在哪里加锁。**
 
-### 4.4 Errors vs. data in GraphQL（GraphQL 里“错误”和“数据”的区别）
+### 4.4 Errors vs. data in GraphQL
 - **Expected outcome** (bid too low, outbid) → **data**: `BidResult { accepted: false, reason: TOO_LOW, minimumCents }`.
 - **Invalid request** (not registered, overlapping booking, unknown id) → **error** with `extensions.code`.
 - Clients switch on `code`, never on the message text, so messages can change freely.
 
-### 4.5 Secret max: field-level privacy（字段级隐私）
+### 4.5 Secret max: field-level privacy
 `leaderMaxCents` lives in `AuctionView` but is **not in the schema**, so GraphQL can't serialize it. `myMaxCents` is a resolver that returns the value **only if the caller is the leader** (tested in `secretMaxIsOnlyVisibleToTheLeader`). The reserve price is never sent at all: the API exposes only `hasReserve` and `reserveMet`.
 
-### 4.6 Inject `Clock`, never call `Instant.now()`（注入时钟）
+### 4.6 Inject `Clock`, never call `Instant.now()`
 Tests freeze time at `2026-10-01T12:00Z` and then call `clock.advance(5 min)` to test "auction ended", with no `Thread.sleep`.
 
-### 4.7 Testcontainers（用真实数据库测试）
+### 4.7 Testcontainers
 Integration tests start a **real PostgreSQL 16** in Docker. An in-memory H2 database would not support `EXCLUDE`, `daterange`, `FOR UPDATE` semantics or `DISTINCT ON`, and would give false confidence.
 
-### 4.8 Idempotent registration（幂等注册）
+### 4.8 Idempotent registration
 `INSERT … ON CONFLICT (auction_id, bidder_id) DO NOTHING` + a primary key → clicking "register" twice (or a network retry) can never hold the deposit twice. Phase 3 generalizes this with **Idempotency-Key** for payments.
 
-### 4.9 Demo data vs. real migrations（演示数据和正式迁移分开）
+### 4.9 Demo data vs. real migrations
 `db/migration` = schema, which runs everywhere. `db/demo` = sample inventory, which runs only with `--spring.profiles.active=demo`. Production never gets fake listings.
 
 ---
 
-## 5. Real bugs found while building / 开发中发现的真实 bug
+## 5. Real bugs found while building
 
 | # | What happened | Root cause | Fix | Lesson |
 |---|---|---|---|---|
@@ -241,7 +230,7 @@ Integration tests start a **real PostgreSQL 16** in Docker. An in-memory H2 data
 
 ---
 
-## 6. Evidence / 测试证据
+## 6. Evidence
 
 | Test | Proves |
 |---|---|
@@ -255,9 +244,9 @@ Integration tests start a **real PostgreSQL 16** in Docker. An in-memory H2 data
 
 ---
 
-## 7. Self-test / 自测题
+## 7. Self-test
 
-> Answer aloud in English first, then open. 先用英文说出答案，再展开看。
+> Answer aloud in English first, then open.
 
 <details><summary>Q1. Why can't you prevent double booking with "SELECT overlapping; if none, INSERT" in Java?</summary>
 
@@ -301,7 +290,7 @@ The guarantees depend on PostgreSQL features (EXCLUDE with GiST, daterange, row-
 
 ---
 
-## 8. Interview Q&A (say these in English) / 面试问答
+## 8. Interview Q&A (say these in English)
 
 **Q: How do you prevent two people renting the same excavator on the same day?**
 > "With a PostgreSQL exclusion constraint on equipment ID and a half-open date range. The database rejects overlaps atomically, so there's no race between checking and inserting. I verified it with a test that fires 50 concurrent requests: exactly one succeeds and the other 49 get a BOOKING_CONFLICT error code."
@@ -314,9 +303,9 @@ The guarantees depend on PostgreSQL features (EXCLUDE with GiST, daterange, row-
 
 ---
 
-## 9. Known limitations → next phases / 已知限制 → 后续阶段
+## 9. Known limitations → next phases
 
-| Now 现在 | Next |
+| Now | Next |
 |---|---|
 | Identity is an `X-User-Id` header (trust-me demo) | **Phase 4:** Auth0 JWT, roles |
 | Deposit "hold" is a DB row; no money moves | **Phase 3:** Stripe test mode (manual capture) + double-entry ledger |
@@ -328,14 +317,14 @@ The guarantees depend on PostgreSQL features (EXCLUDE with GiST, daterange, row-
 
 ---
 
-## 10. How to study this phase (道 + 术) / 怎么学这一阶段
+## 10. How to study this phase
 
-**道:**
+**Principles:**
 1. **Generation:** Before opening `DefaultAuctionService.placeBid`, write the 5 steps from diagram 2.2 on paper, then compare.
 2. **Elaboration:** Explain diagram 2.3 to yourself in English, as if to a Stripe interviewer.
 3. **Interleaving:** On the same day, do NeetCode *Merge Intervals* and re-read `V2__rentals.sql`. It's the same idea, once in code and once in the database.
 
-**术 (do these on your Windows machine):**
+**Concrete drills (do these on your Windows machine):**
 - 🔁 **Break-it drill:** Delete `FOR UPDATE` in `AuctionRepository.lockById` → `.\mvnw.cmd verify` → watch `AuctionConcurrencyIT` fail → restore it.
 - 🔁 **Break-it drill 2:** Comment out the `EXCLUDE` line in `V2__rentals.sql` (with a fresh DB) → `BookingConcurrencyIT` now creates many bookings.
 - 🔁 **N+1 drill:** Replace `@BatchMapping equipment(...)` with a `@SchemaMapping` that calls `catalog.findById` → the statement-count assertion fails. Then read the number it reports.
@@ -343,7 +332,7 @@ The guarantees depend on PostgreSQL features (EXCLUDE with GiST, daterange, row-
 
 ---
 
-## 11. PR text to paste (you open the PR yourself) / PR 文本（你自己开 PR）
+## 11. PR text to paste (you open the PR yourself)
 
 **Title:**
 ```

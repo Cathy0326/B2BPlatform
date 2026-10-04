@@ -2,8 +2,6 @@
 
 **Heavy-equipment auctions, rentals & escrow settlement**, a B2B marketplace where bids can't race, bookings can't double-book, and every dollar is traceable through a double-entry ledger.
 
-> 重型设备 B2B 交易平台：在线竞拍、按天租赁、托管结算。出价不会冲突、预订不会重叠，每一分钱都能在复式账本里追溯。
-
 | Layer | Tech |
 |---|---|
 | Frontend | Nuxt 4 (Vue 3, TypeScript, SSR) |
@@ -39,7 +37,7 @@ cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo   # :8080, 
 cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
 cd backend && ./mvnw verify   # 29 unit + 12 Testcontainers integration tests
 ```
-Windows (PowerShell) commands are in [docs/handover/phase-2.md](docs/handover/phase-2.md#1-how-to-run-on-windows--在-windows-上运行).
+Windows (PowerShell) commands are in [docs/handover/phase-2.md](docs/handover/phase-2.md#1-how-to-run-on-windows).
 
 ## Roadmap
 
