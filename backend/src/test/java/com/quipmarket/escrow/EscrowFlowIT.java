@@ -155,4 +155,47 @@ class EscrowFlowIT {
         assertThat(payments.find(reg.paymentId()).orElseThrow().clientSecret()).isNotBlank();
         assertThatThrownBy(() -> auctions.placeBid(lot, "fay", 16_000_000)).hasMessageContaining("not complete");
     }
+
+    @Test
+    void backgroundJobSettlesEndedAuctionsAndIsSafeToRunTwice() {
+        String lot = wonLot();
+
+        escrow.runPendingWork();
+        escrow.runPendingWork(); // the scheduler may fire again before anything changed
+
+        var deals = escrow.dealsForBuyer("alice").stream().filter(d -> d.auctionId().equals(lot)).toList();
+        assertThat(deals).hasSize(1);
+        assertThat(deals.getFirst().state()).isEqualTo(EscrowDeal.State.AWAITING_BALANCE);
+        assertThat(ledger.balanceOf(deals.getFirst().escrowAccount())).isEqualTo(1_500_000); // deposit captured once
+    }
+
+    @Test
+    void aDeclinedBalanceCanBeRetriedWithAnotherCard() {
+        EscrowDeal deal = escrow.settle(wonLot()).orElseThrow();
+
+        assertThatThrownBy(() -> escrow.payBalance(deal.id(), "alice", "pm_card_chargeDeclined")).isInstanceOf(PaymentDeclinedException.class);
+        EscrowDeal afterDecline = escrow.find(deal.id()).orElseThrow();
+        assertThat(afterDecline.state()).isEqualTo(EscrowDeal.State.AWAITING_BALANCE);
+        assertThat(ledger.balanceOf(deal.escrowAccount())).isEqualTo(1_500_000); // nothing moved
+
+        EscrowDeal paid = escrow.payBalance(deal.id(), "alice", "pm_card_visa");
+
+        assertThat(paid.state()).isEqualTo(EscrowDeal.State.FUNDED);
+        assertThat(paid.balancePaymentId()).isNotEqualTo(afterDecline.balancePaymentId()); // a NEW charge, because the first failed
+        assertThat(ledger.balanceOf(deal.escrowAccount())).isEqualTo(deal.hammerCents());
+    }
+
+    @Test
+    void payingAgainDuringThreeDSecureReusesThePendingChargeInsteadOfStartingASecondOne() {
+        EscrowDeal deal = escrow.settle(wonLot()).orElseThrow();
+
+        EscrowDeal first = escrow.payBalance(deal.id(), "alice", "pm_card_authenticationRequired");
+        EscrowDeal second = escrow.payBalance(deal.id(), "alice", "pm_card_visa");
+
+        assertThat(first.state()).isEqualTo(EscrowDeal.State.AWAITING_BALANCE); // waiting for the buyer's bank
+        assertThat(payments.find(first.balancePaymentId()).orElseThrow().status()).isEqualTo(Payment.Status.REQUIRES_ACTION);
+        assertThat(second.balancePaymentId()).isEqualTo(first.balancePaymentId());
+        assertThat(jdbc.sql("SELECT count(*) FROM payments WHERE auction_id = :a AND purpose = 'BALANCE'")
+                .param("a", deal.auctionId()).query(Integer.class).single()).isEqualTo(1);
+    }
 }

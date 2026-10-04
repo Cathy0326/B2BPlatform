@@ -200,6 +200,26 @@
               <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
             </configuration>
           </execution>
+          <execution>
+            <!-- Quality gate: the build fails if coverage drops below these floors. They sit ~2 points under the
+                 current values (93.7% lines, 85.3% branches) so run-to-run noise from concurrency tests cannot
+                 break CI, while untested new code does. Raise them as coverage grows; never lower them silently. -->
+            <id>check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
+                    <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.83</minimum></limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
     </plugins>

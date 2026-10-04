@@ -73,4 +73,26 @@ class LedgerIT {
         assertThatThrownBy(() -> jdbc.sql("DELETE FROM journal_entries WHERE id = :e").param("e", e.id()).update())
                 .rootCause().hasMessageContaining("append-only");
     }
+
+    @Test
+    void malformedEntriesAreRejectedBeforeReachingTheDatabase() {
+        assertThatThrownBy(() -> ledger.post("TEST", "single-" + System.nanoTime(), "one line", List.of(Ledger.Line.debit("platform_cash", 100))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("at least two lines");
+        assertThatThrownBy(() -> ledger.post("TEST", "neg-" + System.nanoTime(), "negative", List.of(
+                new Ledger.Line("platform_cash", -100, 0), new Ledger.Line("platform_revenue", 0, -100))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Negative");
+        assertThatThrownBy(() -> ledger.post("TEST", "neg2-" + System.nanoTime(), "negative credit", List.of(
+                new Ledger.Line("platform_cash", 100, 0), new Ledger.Line("platform_revenue", 0, -100))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Negative");
+    }
+
+    @Test
+    void entriesCanBeListedForOneReferenceOrAcrossTheWholeLedger() {
+        String ref = "list-" + System.nanoTime();
+        ledger.post("TEST", ref, "listing", List.of(Ledger.Line.debit("platform_cash", 7), Ledger.Line.credit("platform_revenue", 7)));
+
+        assertThat(ledger.entries(ref, 10)).singleElement().satisfies(e -> assertThat(e.reference()).isEqualTo(ref));
+        assertThat(ledger.entries(null, 500)).extracting(Ledger.Entry::reference).contains(ref);
+        assertThat(ledger.entries(null, 1)).hasSize(1);
+    }
 }

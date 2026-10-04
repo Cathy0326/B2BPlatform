@@ -18,6 +18,8 @@ export default defineConfig({
       include: ['app/utils/**', 'app/services/**'],
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'reports/coverage',
+      // Quality gate for `npm run test:ci`: fails below these floors (current: 99% lines, 89% branches, 97% functions).
+      thresholds: { lines: 95, statements: 90, branches: 85, functions: 90 },
     },
   },
 })
