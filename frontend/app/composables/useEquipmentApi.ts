@@ -14,6 +14,11 @@ let gql: GraphQlClient | null = null
 let mockEquipment: EquipmentApi | null = null
 let mockAuctions: AuctionApi | null = null
 
+/** The GraphQL client, or null in mock mode. */
+export function useGraphQlClient(): GraphQlClient | null {
+  return graphQl()
+}
+
 function graphQl(): GraphQlClient | null {
   const config = useRuntimeConfig().public
   if (!config.graphqlUrl) return null

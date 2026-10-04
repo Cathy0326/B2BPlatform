@@ -21,5 +21,12 @@ import org.springframework.test.context.TestPropertySource;
 @AutoConfigureMockMvc
 @AutoConfigureHttpGraphQlTester
 @Import(TestInfrastructure.class)
-@TestPropertySource(properties = "spring.flyway.locations=classpath:db/migration,classpath:db/demo")
-public @interface IntegrationTest {}
+@TestPropertySource(properties = {
+        "spring.flyway.locations=classpath:db/migration,classpath:db/demo",
+        "quipmarket.escrow.jobs-enabled=false",          // tests drive settlement explicitly
+        "quipmarket.payments.gateway=simulated",
+        "quipmarket.stripe.webhook-secret=" + IntegrationTest.WEBHOOK_SECRET
+})
+public @interface IntegrationTest {
+    String WEBHOOK_SECRET = "whsec_test_0123456789abcdef";
+}

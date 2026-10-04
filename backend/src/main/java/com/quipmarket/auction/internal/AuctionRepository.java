@@ -127,22 +127,58 @@ class AuctionRepository {
                 .list();
     }
 
-    /** Idempotent: ON CONFLICT DO NOTHING, then read back whatever row exists. */
-    Registration register(String auctionId, String bidderId, long depositCents) {
-        jdbc.sql("""
-                        INSERT INTO auction_registrations (auction_id, bidder_id, deposit_cents)
-                        VALUES (:a, :b, :d) ON CONFLICT (auction_id, bidder_id) DO NOTHING
+    /** Inserts a PENDING registration if none exists. Returns true if this call created it. */
+    boolean insertRegistration(String auctionId, String bidderId, long depositCents, String paymentId) {
+        return jdbc.sql("""
+                        INSERT INTO auction_registrations (auction_id, bidder_id, deposit_cents, status, payment_id)
+                        VALUES (:a, :b, :d, 'PENDING', :p) ON CONFLICT (auction_id, bidder_id) DO NOTHING
                         """)
-                .param("a", auctionId).param("b", bidderId).param("d", depositCents).update();
-        return findRegistration(auctionId, bidderId).orElseThrow();
+                .param("a", auctionId).param("b", bidderId).param("d", depositCents).param("p", paymentId).update() == 1;
     }
 
     Optional<Registration> findRegistration(String auctionId, String bidderId) {
-        return jdbc.sql("SELECT auction_id, bidder_id, deposit_cents, status, created_at FROM auction_registrations WHERE auction_id = :a AND bidder_id = :b")
-                .param("a", auctionId).param("b", bidderId)
-                .query((rs, i) -> new Registration(rs.getString("auction_id"), rs.getString("bidder_id"), rs.getLong("deposit_cents"),
-                        Registration.Status.valueOf(rs.getString("status")), rs.getTimestamp("created_at").toInstant()))
-                .optional();
+        return jdbc.sql(REG_SELECT + " WHERE auction_id = :a AND bidder_id = :b")
+                .param("a", auctionId).param("b", bidderId).query(this::mapRegistration).optional();
+    }
+
+    List<Registration> registrations(String auctionId) {
+        return jdbc.sql(REG_SELECT + " WHERE auction_id = :a ORDER BY created_at").param("a", auctionId).query(this::mapRegistration).list();
+    }
+
+    List<Registration> heldInSettledAuctions() {
+        return jdbc.sql(REG_SELECT + " r WHERE r.status = 'HELD' AND EXISTS (SELECT 1 FROM auctions a WHERE a.id = r.auction_id AND a.settled_at IS NOT NULL)")
+                .query(this::mapRegistration).list();
+    }
+
+    void setRegistrationStatusByPayment(String paymentId, Registration.Status status) {
+        jdbc.sql("UPDATE auction_registrations SET status = :s WHERE payment_id = :p").param("s", status.name()).param("p", paymentId).update();
+    }
+
+    void setRegistrationStatus(String auctionId, String bidderId, Registration.Status status) {
+        jdbc.sql("UPDATE auction_registrations SET status = :s WHERE auction_id = :a AND bidder_id = :b")
+                .param("s", status.name()).param("a", auctionId).param("b", bidderId).update();
+    }
+
+    void deleteRegistrationByPayment(String paymentId) {
+        jdbc.sql("DELETE FROM auction_registrations WHERE payment_id = :p").param("p", paymentId).update();
+    }
+
+    List<String> endedUnsettled(Instant now) {
+        return jdbc.sql("SELECT id FROM auctions WHERE ends_at <= :now AND settled_at IS NULL ORDER BY ends_at")
+                .param("now", Timestamp.from(now)).query(String.class).list();
+    }
+
+    /** Compare-and-set claim: only one worker can flip settled_at from NULL. */
+    boolean claimForSettlement(String auctionId, Instant now) {
+        return jdbc.sql("UPDATE auctions SET settled_at = :now WHERE id = :id AND settled_at IS NULL AND ends_at <= :now")
+                .param("now", Timestamp.from(now)).param("id", auctionId).update() == 1;
+    }
+
+    private static final String REG_SELECT = "SELECT auction_id, bidder_id, deposit_cents, status, created_at, payment_id FROM auction_registrations";
+
+    private Registration mapRegistration(ResultSet rs, int i) throws SQLException {
+        return new Registration(rs.getString("auction_id"), rs.getString("bidder_id"), rs.getLong("deposit_cents"),
+                Registration.Status.valueOf(rs.getString("status")), rs.getTimestamp("created_at").toInstant(), rs.getString("payment_id"));
     }
 
     void deleteAll() {

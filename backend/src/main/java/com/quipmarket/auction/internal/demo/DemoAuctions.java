@@ -73,16 +73,31 @@ class DemoAuctions implements ApplicationRunner {
     public void reseedIfIdle() {
         if (!auctions.list(AuctionState.Status.LIVE).isEmpty()) return;
         log.info("No live auctions: seeding demo lots relative to now");
-        jdbc.sql("DELETE FROM auction_registrations").update();
-        jdbc.sql("DELETE FROM bid_submissions").update();
-        jdbc.sql("DELETE FROM auction_bids").update();
-        jdbc.sql("DELETE FROM auctions").update();
+        // Remove only lots that are fully finished: ended + settled (holds released) and without an escrow deal,
+        // plus upcoming lots nobody registered for. Lots with money in escrow are kept for the ledger history.
+        List<String> stale = jdbc.sql("""
+                        SELECT a.id FROM auctions a
+                        WHERE (a.ends_at <= now() AND a.settled_at IS NOT NULL
+                               AND NOT EXISTS (SELECT 1 FROM escrow_deals d WHERE d.auction_id = a.id))
+                           OR (a.starts_at > now()
+                               AND NOT EXISTS (SELECT 1 FROM auction_registrations r WHERE r.auction_id = a.id))
+                        """).query(String.class).list();
+        if (!stale.isEmpty()) {
+            for (String table : List.of("auction_registrations", "bid_submissions", "auction_bids")) {
+                jdbc.sql("DELETE FROM " + table + " WHERE auction_id IN (:ids)").param("ids", stale).update();
+            }
+            jdbc.sql("DELETE FROM payments WHERE auction_id IN (:ids)").param("ids", stale).update();
+            jdbc.sql("DELETE FROM auctions WHERE id IN (:ids)").param("ids", stale).update();
+        }
 
         Instant now = clock.instant();
         for (Seed s : SEEDS) {
+            // First seed keeps the friendly ids (au-2001...); later reseeds get a unique suffix.
+            boolean taken = jdbc.sql("SELECT count(*) FROM auctions WHERE id = :id").param("id", s.id()).query(Integer.class).single() > 0;
+            String id = taken ? s.id() + "-" + (now.getEpochSecond() / 60) : s.id();
             Instant startsAt = now.plus(s.startOffset());
             Instant endsAt = now.plus(s.endOffset());
-            AuctionState state = new AuctionState(s.id(), s.equipmentId(), s.startCents(), s.reserveCents(), s.depositCents(),
+            AuctionState state = new AuctionState(id, s.equipmentId(), s.startCents(), s.reserveCents(), s.depositCents(),
                     startsAt, endsAt, 120, s.startCents(), null, null, 0);
             // Replay history at evenly spaced past instants. The engine needs "now" inside the window,
             // so we insert the lot with its real times and apply each historic bid via the engine directly.
@@ -99,14 +114,23 @@ class DemoAuctions implements ApplicationRunner {
             auctions.create(state);
             for (var b : bids) {
                 jdbc.sql("INSERT INTO auction_bids (auction_id, bidder_id, amount_cents, auto, created_at) VALUES (:a, :b, :amt, :auto, :at)")
-                        .param("a", s.id()).param("b", b.bidderId()).param("amt", b.amountCents()).param("auto", b.auto())
+                        .param("a", id).param("b", b.bidderId()).param("amt", b.amountCents()).param("auto", b.auto())
                         .param("at", java.sql.Timestamp.from(b.at())).update();
             }
-            for (String bidder : s.bidders()) {
-                jdbc.sql("INSERT INTO auction_registrations (auction_id, bidder_id, deposit_cents) VALUES (:a, :b, :d)")
-                        .param("a", s.id()).param("b", bidder).param("d", s.depositCents()).update();
-            }
+            for (String bidder : s.bidders()) registerBot(id, bidder, s.depositCents());
         }
+    }
+
+    /**
+     * Demo bidders get a HELD registration WITHOUT a payment: bots must never create charges at a real
+     * provider (with the Stripe gateway that would mean a PaymentIntent every few seconds).
+     */
+    private void registerBot(String auctionId, String bot, long depositCents) {
+        jdbc.sql("""
+                        INSERT INTO auction_registrations (auction_id, bidder_id, deposit_cents, status)
+                        VALUES (:a, :b, :d, 'HELD') ON CONFLICT (auction_id, bidder_id) DO NOTHING
+                        """)
+                .param("a", auctionId).param("b", bot).param("d", depositCents).update();
     }
 
     /** A rival may bid on a random live lot, making the demo feel alive. */
@@ -121,7 +145,7 @@ class DemoAuctions implements ApplicationRunner {
         long min = lot.minimumNextBidCents();
         long max = min + AuctionEngine.increment(min) * random.nextInt(4);
         try {
-            auctions.register(lot.id(), bot);
+            registerBot(lot.id(), bot, lot.depositCents());
             auctions.placeBid(lot.id(), bot, max);
         } catch (RuntimeException e) {
             log.debug("Bot bid skipped: {}", e.getMessage());

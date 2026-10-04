@@ -1,6 +1,6 @@
 import type { Auction, BidOutcome, BidRejection } from '~/types/auction'
 import { NotRegisteredError, type AuctionApi, type DepositHold } from '~/services/auctionApi'
-import { GraphQlError, type GraphQlClient } from './client'
+import { GraphQlError, newIdempotencyKey, type GraphQlClient } from './client'
 
 const AUCTION_FIELDS = `
   id equipment { id } startingPriceCents depositCents hasReserve reserveMet
@@ -57,6 +57,7 @@ interface RegistrationDto {
   depositCents: number
   status: DepositHold['status']
   createdAt: string
+  clientSecret: string | null
 }
 const toHold = (r: RegistrationDto): DepositHold => ({
   auctionId: r.auctionId,
@@ -64,8 +65,9 @@ const toHold = (r: RegistrationDto): DepositHold => ({
   amountCents: r.depositCents,
   status: r.status,
   createdAt: Date.parse(r.createdAt),
+  clientSecret: r.clientSecret,
 })
-const REG_FIELDS = 'auctionId bidderId depositCents status createdAt'
+const REG_FIELDS = 'auctionId bidderId depositCents status createdAt clientSecret'
 
 export function createGraphQlAuctionApi(gql: GraphQlClient): AuctionApi {
   return {
@@ -84,12 +86,21 @@ export function createGraphQlAuctionApi(gql: GraphQlClient): AuctionApi {
       )
       return data.myRegistration ? toHold(data.myRegistration) : null
     },
-    async registerToBid(auctionId) {
+    async registerToBid(auctionId, _bidderId, paymentMethodId) {
+      // A fresh Idempotency-Key per click: a network retry of THIS request can never hold the deposit twice.
       const data = await gql.request<{ registerToBid: RegistrationDto }>(
-        `mutation($a: ID!) { registerToBid(auctionId: $a) { ${REG_FIELDS} } }`,
-        { a: auctionId },
+        `mutation($a: ID!, $pm: String) { registerToBid(auctionId: $a, paymentMethodId: $pm) { ${REG_FIELDS} } }`,
+        { a: auctionId, pm: paymentMethodId ?? null },
+        { 'Idempotency-Key': newIdempotencyKey() },
       )
       return toHold(data.registerToBid)
+    },
+    async confirmRegistration(auctionId) {
+      const data = await gql.request<{ confirmRegistration: RegistrationDto }>(
+        `mutation($a: ID!) { confirmRegistration(auctionId: $a) { ${REG_FIELDS} } }`,
+        { a: auctionId },
+      )
+      return toHold(data.confirmRegistration)
     },
     async placeBid(auctionId, _bidderId, maxCents): Promise<BidOutcome> {
       try {

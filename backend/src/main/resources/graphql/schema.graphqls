@@ -25,15 +25,42 @@ type Query {
     "Cheapest day/week/month combination for a rental. Does not reserve anything."
     rentalQuote(equipmentId: ID!, start: Date!, end: Date!): RentalQuote!
     loanQuote(input: LoanInput!): LoanQuote!
+
+    "Which payment provider is active, and the Stripe publishable key for Stripe Elements (if any)."
+    paymentConfig: PaymentConfig!
+    "Escrow deals where the caller is the buyer."
+    myDeals: [EscrowDeal!]!
+    deal(id: ID!): EscrowDeal
+
+    "Every ledger account with its debit/credit totals. Total debits must equal total credits."
+    trialBalance: TrialBalance!
+    journalEntries(reference: String, last: Int = 50): [JournalEntry!]!
+    auditLog(last: Int = 50): [AuditRecord!]!
+    "Recomputes the audit hash chain and reports the first broken record, if any."
+    verifyAuditChain: AuditVerification!
 }
 
 type Mutation {
     "Reserve equipment for [start, end). Fails with BOOKING_CONFLICT if the dates overlap another booking."
     createBooking(input: CreateBookingInput!): Booking!
-    "Hold the refundable deposit required to bid. Idempotent: calling twice returns the same hold."
-    registerToBid(auctionId: ID!): Registration!
+    """
+    Authorize (hold, not charge) the refundable deposit required to bid.
+    paymentMethodId: Stripe PaymentMethod id from Stripe Elements, or a Stripe test token such as
+    "pm_card_visa" / "pm_card_chargeDeclined". Omitted = test card.
+    Safe to retry: one registration per bidder per auction; also honours the Idempotency-Key header.
+    """
+    registerToBid(auctionId: ID!, paymentMethodId: String): Registration!
+    "Re-check a PENDING deposit authorization with the provider (after 3-D Secure)."
+    confirmRegistration(auctionId: ID!): Registration!
     "Submit a proxy bid: the system bids for you up to maxCents."
     placeBid(auctionId: ID!, maxCents: Long!): BidResult!
+
+    "Pay the remaining balance into escrow. REQUIRES an Idempotency-Key header."
+    payBalance(dealId: ID!, paymentMethodId: String): EscrowDeal!
+    "Buyer accepts the machine: escrow is released to the seller minus the platform fee."
+    confirmDelivery(dealId: ID!): EscrowDeal!
+    "Settle an ended auction now instead of waiting for the background job (demo / operations)."
+    settleAuction(auctionId: ID!): EscrowDeal
 }
 
 type Subscription {
@@ -170,7 +197,7 @@ type BidResult {
     auction: Auction!
 }
 
-enum RegistrationStatus { HELD RELEASED APPLIED }
+enum RegistrationStatus { PENDING HELD RELEASED APPLIED }
 
 type Registration {
     auctionId: ID!
@@ -178,6 +205,114 @@ type Registration {
     depositCents: Long!
     status: RegistrationStatus!
     createdAt: DateTime!
+    paymentStatus: PaymentStatus
+    "Only set while the payer must complete 3-D Secure in the browser (Stripe.js handleNextAction)."
+    clientSecret: String
+}
+
+# ---------- payments ----------
+
+enum PaymentStatus { PROCESSING REQUIRES_ACTION AUTHORIZED CAPTURED CANCELED FAILED }
+enum PaymentPurpose { DEPOSIT BALANCE }
+
+type PaymentConfig {
+    "SIMULATED or STRIPE"
+    gateway: String!
+    stripePublishableKey: String
+}
+
+type Payment {
+    id: ID!
+    provider: String!
+    providerRef: String
+    purpose: PaymentPurpose!
+    amountCents: Long!
+    currency: String!
+    status: PaymentStatus!
+    createdAt: DateTime!
+}
+
+# ---------- escrow ----------
+
+enum EscrowState { AWAITING_DEPOSIT_CAPTURE AWAITING_BALANCE FUNDED RELEASED PAID_OUT }
+
+type EscrowDeal {
+    id: ID!
+    auctionId: ID!
+    equipment: Equipment!
+    buyerId: String!
+    sellerId: String!
+    hammerCents: Long!
+    depositCents: Long!
+    "hammer - deposit"
+    balanceDueCents: Long!
+    "5% platform fee, paid by the seller"
+    feeCents: Long!
+    "hammer - fee"
+    sellerProceedsCents: Long!
+    state: EscrowState!
+    depositPayment: Payment
+    balancePayment: Payment
+    "Ledger entries for this deal, newest first."
+    journal: [JournalEntry!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+# ---------- ledger ----------
+
+enum AccountType { ASSET LIABILITY EQUITY REVENUE EXPENSE }
+
+type JournalEntry {
+    id: ID!
+    kind: String!
+    reference: String!
+    description: String!
+    createdAt: DateTime!
+    lines: [JournalLine!]!
+}
+
+type JournalLine {
+    accountCode: String!
+    debitCents: Long!
+    creditCents: Long!
+}
+
+type AccountBalance {
+    code: String!
+    type: AccountType!
+    name: String!
+    debitsCents: Long!
+    creditsCents: Long!
+    "On the account's normal side (debit for assets, credit for liabilities and revenue)."
+    balanceCents: Long!
+}
+
+type TrialBalance {
+    accounts: [AccountBalance!]!
+    totalDebitsCents: Long!
+    totalCreditsCents: Long!
+    balanced: Boolean!
+}
+
+# ---------- audit ----------
+
+type AuditRecord {
+    seq: Long!
+    eventType: String!
+    subject: String!
+    actor: String!
+    payload: String!
+    createdAt: DateTime!
+    prevHash: String!
+    hash: String!
+}
+
+type AuditVerification {
+    valid: Boolean!
+    entries: Long!
+    firstBrokenSeq: Long
+    reason: String
 }
 
 # ---------- financing ----------

@@ -14,15 +14,21 @@ export interface DepositHold {
   auctionId: string
   bidderId: string
   amountCents: Cents
-  status: 'HELD' | 'RELEASED' | 'APPLIED'
+  /** PENDING = card authorization not finished (e.g. 3-D Secure). Only HELD may bid. */
+  status: 'PENDING' | 'HELD' | 'RELEASED' | 'APPLIED'
   createdAt: number
+  /** Set while the payer must finish 3-D Secure in the browser (Stripe.js handleNextAction). */
+  clientSecret?: string | null
 }
 
 export interface AuctionApi {
   list(viewerId: string | null): Promise<Auction[]>
   get(id: string, viewerId: string | null): Promise<Auction | null>
   getHold(auctionId: string, bidderId: string): Promise<DepositHold | null>
-  registerToBid(auctionId: string, bidderId: string): Promise<DepositHold>
+  /** paymentMethodId: Stripe PaymentMethod id or test token (ignored by the in-browser mock). */
+  registerToBid(auctionId: string, bidderId: string, paymentMethodId?: string | null): Promise<DepositHold>
+  /** Re-check a PENDING authorization after 3-D Secure (backend only). */
+  confirmRegistration?(auctionId: string): Promise<DepositHold | null>
   placeBid(auctionId: string, bidderId: string, maxCents: Cents): Promise<BidOutcome>
   /** Live updates (Phase 2: GraphQL subscription over WebSocket). Returns an unsubscribe fn. */
   subscribe(auctionId: string, viewerId: string | null, onChange: (a: Auction) => void): () => void

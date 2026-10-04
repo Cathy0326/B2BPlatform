@@ -45,7 +45,7 @@ class AuctionConcurrencyIT {
         var maxes = new ArrayList<Long>();
         for (int i = 0; i < threads; i++) maxes.add(15_000_000L + i * 100_000L);
         Collections.shuffle(maxes);
-        for (int i = 0; i < threads; i++) auctions.register(lot, "bidder-" + i);
+        for (int i = 0; i < threads; i++) auctions.register(lot, "bidder-" + i, null);
 
         var go = new CountDownLatch(1);
         try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
@@ -78,8 +78,8 @@ class AuctionConcurrencyIT {
         String lot = newLot("it-reg-" + System.nanoTime());
         assertThatThrownBy(() -> auctions.placeBid(lot, "carol", 16_000_000)).isInstanceOf(NotRegisteredException.class);
 
-        var first = auctions.register(lot, "carol");
-        var second = auctions.register(lot, "carol");
+        var first = auctions.register(lot, "carol", null);
+        var second = auctions.register(lot, "carol", null);
         assertThat(second).isEqualTo(first);
         int holds = jdbc.sql("SELECT count(*) FROM auction_registrations WHERE auction_id = :a").param("a", lot).query(Integer.class).single();
         assertThat(holds).isEqualTo(1);
@@ -93,7 +93,7 @@ class AuctionConcurrencyIT {
         String lot = "it-soft-" + System.nanoTime();
         auctions.create(new AuctionState(lot, "eq-1002", 15_000_000, null, 1_500_000, now.minusSeconds(3600),
                 now.plusSeconds(30), 120, 15_000_000, null, null, 0));
-        auctions.register(lot, "dave");
+        auctions.register(lot, "dave", null);
 
         var r = auctions.placeBid(lot, "dave", 15_500_000);
         assertThat(r.extended()).isTrue();

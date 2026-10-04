@@ -3,6 +3,8 @@ const links = [
   { to: '/', label: 'Equipment' },
   { to: '/auctions', label: 'Auctions' },
   { to: '/financing', label: 'Financing' },
+  { to: '/deals', label: 'My deals' },
+  { to: '/ledger', label: 'Ledger' },
   { to: '/escrow', label: 'Escrow' },
 ]
 const source = useDataSourceLabel()

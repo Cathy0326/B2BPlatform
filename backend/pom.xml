@@ -20,6 +20,7 @@
   <properties>
     <java.version>21</java.version>
     <spring-modulith.version>2.1.1</spring-modulith.version>
+    <stripe-java.version>34.0.0</stripe-java.version>
   </properties>
 
   <dependencyManagement>
@@ -75,6 +76,13 @@
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
+    </dependency>
+
+    <!-- Payments: Stripe (test mode) behind the PaymentGateway interface -->
+    <dependency>
+      <groupId>com.stripe</groupId>
+      <artifactId>stripe-java</artifactId>
+      <version>${stripe-java.version}</version>
     </dependency>
 
     <!-- Module boundaries are verified by a test -->

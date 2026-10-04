@@ -21,7 +21,30 @@ public interface AuctionService {
 
     List<VisibleBid> bids(String auctionId, int last);
 
-    Registration register(String auctionId, String bidderId);
+    /**
+     * Places the refundable deposit hold (via the payments module) and registers the bidder.
+     * paymentMethodId: Stripe "pm_..." from Stripe Elements, a Stripe test token, or null (= test card).
+     */
+    Registration register(String auctionId, String bidderId, String paymentMethodId);
+
+    /** Re-check the deposit authorization with the provider (e.g. after 3-D Secure). */
+    Registration confirmRegistration(String auctionId, String bidderId);
+
+    List<Registration> registrations(String auctionId);
+
+    // ---- settlement hooks (used by the escrow module) ----
+
+    /** Ended auctions not yet claimed for settlement. */
+    List<String> endedUnsettledAuctionIds();
+
+    /** Atomically claims the auction for settlement. Empty if another worker already did, or it has not ended. */
+    Optional<AuctionView> claimForSettlement(String auctionId);
+
+    /** For seeded bidders without a payment: mark the registration directly. */
+    void markRegistration(String auctionId, String bidderId, Registration.Status status);
+
+    /** Registrations still HELD in auctions that were already settled (holds to release, retried by the escrow job). */
+    List<Registration> heldRegistrationsInSettledAuctions();
 
     Optional<Registration> registration(String auctionId, String bidderId);
 

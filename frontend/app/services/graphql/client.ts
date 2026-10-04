@@ -14,6 +14,11 @@ export class GraphQlError extends Error {
   }
 }
 
+/** One key per user action (click). Re-sending the same key on retry is what makes it safe. */
+export function newIdempotencyKey(): string {
+  return `idem-${crypto.randomUUID()}`
+}
+
 export interface GraphQlConfig {
   httpUrl: string
   wsUrl: string
@@ -22,8 +27,12 @@ export interface GraphQlConfig {
 }
 
 export function createGraphQlClient(config: GraphQlConfig) {
-  async function request<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  async function request<T>(
+    query: string,
+    variables: Record<string, unknown> = {},
+    extraHeaders: Record<string, string> = {},
+  ): Promise<T> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders }
     const user = config.userId()
     if (user) headers['X-User-Id'] = user
 

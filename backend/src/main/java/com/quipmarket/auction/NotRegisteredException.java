@@ -8,6 +8,10 @@ public class NotRegisteredException extends DomainException {
         super("Place a refundable deposit hold before bidding.");
     }
 
+    public NotRegisteredException(String message) {
+        super(message);
+    }
+
     @Override
     public String code() {
         return "NOT_REGISTERED";

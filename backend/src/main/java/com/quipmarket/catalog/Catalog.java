@@ -28,6 +28,11 @@ public class Catalog {
         return repository.findById(id);
     }
 
+    /** Who receives the sale proceeds for this listing. */
+    public String sellerOf(String equipmentId) {
+        return repository.sellerOf(equipmentId);
+    }
+
     /** Batch lookup used by GraphQL @BatchMapping (one query for N ids). */
     public Map<String, Equipment> findByIds(Collection<String> ids) {
         return repository.findByIds(ids);

@@ -23,6 +23,18 @@ spring:
       allowed-methods: GET,POST
       allowed-headers: "*"
 
+quipmarket:
+  # Payment provider: simulated (default; no keys needed) or stripe (test mode only).
+  payments:
+    gateway: ${PAYMENTS_GATEWAY:simulated}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}          # sk_test_...  NEVER commit this
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:} # pk_test_...  (public by design)
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}   # whsec_...    from `stripe listen` or the dashboard
+  escrow:
+    jobs-enabled: true
+    job-delay-ms: 15000
+
 management:
   endpoints:
     web:
@@ -40,3 +52,5 @@ spring:
 quipmarket:
   demo:
     bots-enabled: true
+  escrow:
+    job-delay-ms: 5000

@@ -9,6 +9,7 @@ import com.quipmarket.catalog.Catalog;
 import com.quipmarket.catalog.Equipment;
 import com.quipmarket.shared.CurrentUser;
 import com.quipmarket.shared.DomainException;
+import com.quipmarket.shared.Idempotency;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,10 +30,15 @@ class AuctionGraphQlController {
 
     private final AuctionService auctions;
     private final Catalog catalog;
+    private final Idempotency idempotency;
+    private final com.quipmarket.payments.Payments payments;
 
-    AuctionGraphQlController(AuctionService auctions, Catalog catalog) {
+    AuctionGraphQlController(AuctionService auctions, Catalog catalog, Idempotency idempotency,
+                             com.quipmarket.payments.Payments payments) {
         this.auctions = auctions;
         this.catalog = catalog;
+        this.idempotency = idempotency;
+        this.payments = payments;
     }
 
     // ---------- queries ----------
@@ -55,10 +61,32 @@ class AuctionGraphQlController {
 
     // ---------- mutations ----------
 
+    /** Optional Idempotency-Key: a retried request returns the original registration. */
     @MutationMapping
-    Registration registerToBid(@Argument String auctionId,
-                               @ContextValue(name = CurrentUser.CONTEXT_KEY, required = false) String userId) {
-        return auctions.register(auctionId, CurrentUser.require(userId));
+    Registration registerToBid(@Argument String auctionId, @Argument String paymentMethodId,
+                               @ContextValue(name = CurrentUser.CONTEXT_KEY, required = false) String userId,
+                               @ContextValue(name = Idempotency.CONTEXT_KEY, required = false) String idempotencyKey) {
+        String user = CurrentUser.require(userId);
+        if (idempotencyKey == null) return auctions.register(auctionId, user, paymentMethodId);
+        return idempotency.run(user, idempotencyKey, "registerToBid", java.util.Map.of("auctionId", auctionId),
+                Registration.class, () -> auctions.register(auctionId, user, paymentMethodId));
+    }
+
+    @MutationMapping
+    Registration confirmRegistration(@Argument String auctionId,
+                                     @ContextValue(name = CurrentUser.CONTEXT_KEY, required = false) String userId) {
+        return auctions.confirmRegistration(auctionId, CurrentUser.require(userId));
+    }
+
+    @SchemaMapping(typeName = "Registration")
+    String paymentStatus(Registration r) {
+        return r.paymentId() == null ? null : payments.find(r.paymentId()).map(p -> p.status().name()).orElse(null);
+    }
+
+    /** Needed by the payer's browser to finish 3-D Secure with Stripe.js. Only the owner can query their registration. */
+    @SchemaMapping(typeName = "Registration")
+    String clientSecret(Registration r) {
+        return r.paymentId() == null ? null : payments.find(r.paymentId()).map(com.quipmarket.payments.Payment::clientSecret).orElse(null);
     }
 
     @MutationMapping

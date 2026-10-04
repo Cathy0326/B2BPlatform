@@ -46,6 +46,10 @@ public class EquipmentRepository {
         return jdbc.sql(SELECT + " WHERE id = :id").param("id", id).query(this::map).optional();
     }
 
+    public String sellerOf(String id) {
+        return jdbc.sql("SELECT seller_id FROM equipment WHERE id = :id").param("id", id).query(String.class).single();
+    }
+
     public Map<String, Equipment> findByIds(Collection<String> ids) {
         if (ids.isEmpty()) return Map.of();
         return jdbc.sql(SELECT + " WHERE id IN (:ids)").param("ids", ids).query(this::map).list().stream()

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 /**
- * Who is calling? Phase 2 demo identity: the "X-User-Id" HTTP header (or the "userId" field of the
+ * Who is calling, and with which Idempotency-Key? Phase 2 demo identity: the "X-User-Id" HTTP header (or the "userId" field of the
  * WebSocket connection_init payload). Phase 4 replaces this with the Auth0 JWT "sub" claim.
  *
  * The id lands in the GraphQL context under {@link #CONTEXT_KEY}; controllers read it with
@@ -22,6 +22,7 @@ public class CurrentUser implements WebSocketGraphQlInterceptor {
 
     public static final String CONTEXT_KEY = "userId";
     private static final String HEADER = "X-User-Id";
+    private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
     private static final String SESSION_ATTR = "quipmarket.userId";
     private static final Pattern VALID = Pattern.compile("[a-z0-9][a-z0-9-]{0,39}");
 
@@ -43,9 +44,12 @@ public class CurrentUser implements WebSocketGraphQlInterceptor {
         if (userId == null && request instanceof org.springframework.graphql.server.WebSocketGraphQlRequest ws) {
             userId = (String) ws.getSessionInfo().getAttributes().get(SESSION_ATTR);
         }
-        if (userId != null) {
-            String id = userId;
-            request.configureExecutionInput((input, builder) -> builder.graphQLContext(Map.of(CONTEXT_KEY, id)).build());
+        var context = new java.util.HashMap<String, Object>();
+        if (userId != null) context.put(CONTEXT_KEY, userId);
+        String idempotencyKey = request.getHeaders().getFirst(IDEMPOTENCY_HEADER);
+        if (idempotencyKey != null) context.put(Idempotency.CONTEXT_KEY, idempotencyKey.trim());
+        if (!context.isEmpty()) {
+            request.configureExecutionInput((input, builder) -> builder.graphQLContext(context).build());
         }
         return chain.next(request);
     }

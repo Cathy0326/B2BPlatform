@@ -1,4 +1,11 @@
--- Demo inventory (generated from frontend/app/data/equipment.ts so both sides match).
+-- Demo data as a REPEATABLE migration (R__ prefix).
+--
+-- Why not V100__...? Versioned seed data with a high number breaks the next schema change:
+-- a new V4 would sort BEFORE the already-applied V100, and Flyway refuses out-of-order migrations.
+-- Repeatable migrations always run after all versioned ones (and re-run when this file changes),
+-- so every statement here must be idempotent.
+-- Inventory generated from frontend/app/data/equipment.ts so frontend mock and backend match.
+
 INSERT INTO equipment (id, title, category, make, model, year, hours, location, listing_type,
                        sale_price_cents, daily_rate_cents, weekly_rate_cents, monthly_rate_cents, description, specs)
 VALUES
@@ -13,7 +20,8 @@ VALUES
     ('eq-1009', '2016 Grove RT765E-2 Rough Terrain Crane', 'CRANE', 'Grove', 'RT765E-2', 2016, 7400, 'Los Angeles, CA', 'BOTH', 39500000, 290000, 850000, 2200000, '65-ton rough terrain crane with a 33 m main boom, jib, and annual certification.', '[{"name":"Max capacity","value":"65 t"},{"name":"Main boom","value":"33.5 m"},{"name":"Max tip height","value":"50 m"},{"name":"Drive","value":"4x4"}]'::jsonb),
     ('eq-1010', '2019 Liebherr LTM 1090-4.2 All Terrain Crane', 'CRANE', 'Liebherr', 'LTM 1090-4.2', 2019, 5300, 'Seattle, WA', 'SALE', 82000000, NULL, NULL, NULL, '90-ton all-terrain crane, 60 m telescopic boom, VarioBase outrigger system.', '[{"name":"Max capacity","value":"90 t"},{"name":"Main boom","value":"60 m"},{"name":"Axles","value":"4"},{"name":"Engine","value":"Liebherr 8-cyl diesel"}]'::jsonb),
     ('eq-1011', '2020 Case 580SN Backhoe Loader', 'BACKHOE', 'Case', '580SN', 2020, 3150, 'Charlotte, NC', 'BOTH', 8900000, 38000, 115000, 290000, 'Extendahoe, 4WD, pilot controls, and a 24" bucket. Great for utilities and site prep.', '[{"name":"Operating weight","value":"7,400 kg"},{"name":"Net power","value":"97 hp"},{"name":"Dig depth (extended)","value":"5.8 m"},{"name":"Loader bucket","value":"1.1 yd³"}]'::jsonb),
-    ('eq-1012', '2022 JCB 3CX Backhoe Loader', 'BACKHOE', 'JCB', '3CX', 2022, 1100, 'Orlando, FL', 'RENT', NULL, 35000, 105000, 270000, 'Compact-footprint backhoe with a 6-in-1 front bucket and powershift transmission.', '[{"name":"Operating weight","value":"8,070 kg"},{"name":"Net power","value":"109 hp"},{"name":"Dig depth","value":"5.9 m"},{"name":"Loader bucket","value":"1.3 yd³"}]'::jsonb);
+    ('eq-1012', '2022 JCB 3CX Backhoe Loader', 'BACKHOE', 'JCB', '3CX', 2022, 1100, 'Orlando, FL', 'RENT', NULL, 35000, 105000, 270000, 'Compact-footprint backhoe with a 6-in-1 front bucket and powershift transmission.', '[{"name":"Operating weight","value":"8,070 kg"},{"name":"Net power","value":"109 hp"},{"name":"Dig depth","value":"5.9 m"},{"name":"Loader bucket","value":"1.3 yd³"}]'::jsonb)
+ON CONFLICT (id) DO NOTHING;
 
 -- Existing rentals (half-open [start, end)).
 INSERT INTO bookings (equipment_id, renter_id, period, total_cents) VALUES
@@ -25,4 +33,12 @@ INSERT INTO bookings (equipment_id, renter_id, period, total_cents) VALUES
     ('eq-1004', 'demo-renter', daterange('2026-10-17', '2026-10-24', '[)'), 0),
     ('eq-1007', 'demo-renter', daterange('2026-10-05', '2026-10-08', '[)'), 0),
     ('eq-1009', 'demo-renter', daterange('2026-11-15', '2026-12-13', '[)'), 0),
-    ('eq-1012', 'demo-renter', daterange('2026-10-20', '2026-11-17', '[)'), 0);
+    ('eq-1012', 'demo-renter', daterange('2026-10-20', '2026-11-17', '[)'), 0)
+-- No conflict target: also skips rows the EXCLUDE constraint would reject (already seeded).
+ON CONFLICT DO NOTHING;
+
+-- Demo sellers (idempotent UPDATEs).
+UPDATE equipment SET seller_id = 'seller-gulfcoast'  WHERE location LIKE '%TX';
+UPDATE equipment SET seller_id = 'seller-pacific'    WHERE location LIKE '%WA' OR location LIKE '%CA';
+UPDATE equipment SET seller_id = 'seller-southeast'  WHERE location LIKE '%GA' OR location LIKE '%NC' OR location LIKE '%FL' OR location LIKE '%TN';
+UPDATE equipment SET seller_id = 'seller-mountain'   WHERE location LIKE '%AZ' OR location LIKE '%CO';
