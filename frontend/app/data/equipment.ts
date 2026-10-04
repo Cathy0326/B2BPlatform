@@ -96,7 +96,7 @@ export const MOCK_EQUIPMENT: Equipment[] = [
     },
     bookings: [
       { start: '2026-10-10', end: '2026-10-17' },
-      { start: '2026-10-15', end: '2026-10-24' },
+      { start: '2026-10-17', end: '2026-10-24' },
     ],
   },
   {

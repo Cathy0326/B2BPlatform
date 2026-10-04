@@ -5,6 +5,7 @@ const links = [
   { to: '/financing', label: 'Financing' },
   { to: '/escrow', label: 'Escrow' },
 ]
+const source = useDataSourceLabel()
 </script>
 
 <template>
@@ -26,7 +27,10 @@ const links = [
     <footer class="site-footer">
       <div class="container spread">
         <span>QuipMarket · heavy-equipment auctions, rentals &amp; escrow settlement</span>
-        <span>Demo project · Nuxt 4 · Spring Boot GraphQL · PostgreSQL</span>
+        <span>
+          Data: <strong>{{ source === 'graphql' ? 'live GraphQL API' : 'in-browser demo data' }}</strong>
+          · Nuxt 4 · Spring Boot GraphQL · PostgreSQL
+        </span>
       </div>
     </footer>
   </div>

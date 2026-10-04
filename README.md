@@ -7,8 +7,8 @@
 | Layer | Tech |
 |---|---|
 | Frontend | Nuxt 4 (Vue 3, TypeScript, SSR) |
-| Backend *(Phase 2)* | Java 21, Spring Boot 3, Spring for GraphQL, modular monolith |
-| Data *(Phase 2)* | PostgreSQL 16, Flyway |
+| Backend | Java 21, Spring Boot 4.1, Spring for GraphQL (queries, mutations, WebSocket subscriptions), modular monolith verified by Spring Modulith |
+| Data | PostgreSQL 16, Flyway, plain SQL via `JdbcClient` |
 | Payments *(Phase 3)* | `PaymentGateway` interface: simulated + Stripe test mode |
 | Platform *(Phase 4)* | Auth0, Docker, GitHub Actions, Kubernetes, OpenTofu |
 
@@ -19,21 +19,33 @@
 - **Escrow deposits**: bidders hold a refundable deposit before bidding.
 - **Rentals**: the cheapest day/week/month mix (dynamic programming), overlap detection, and a suggested next free window.
 - **Financing**: an amortization schedule computed in integer cents, plus a buy-vs-rent break-even.
+- **Concurrency-safe by construction**: a PostgreSQL `EXCLUDE` constraint makes double booking impossible, and a per-lot row lock serializes bids. Both are proven by 40–50-thread race tests.
+- **No N+1**: nested GraphQL fields are batched, and a test counts SQL statements.
 
 ## Run it
 
+**Frontend only (mock data, no backend needed):**
 ```bash
 cd frontend
 npm install
 npm run dev      # http://localhost:3000
-npm test         # unit tests (Vitest)
+npm test         # 57 unit tests (Vitest)
 ```
+
+**Full stack (needs Docker + JDK 21):**
+```bash
+docker compose up -d db
+cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo   # :8080, GraphiQL at /graphiql
+cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
+cd backend && ./mvnw verify   # 29 unit + 12 Testcontainers integration tests
+```
+Windows (PowerShell) commands are in [docs/handover/phase-2.md](docs/handover/phase-2.md#1-how-to-run-on-windows--在-windows-上运行).
 
 ## Roadmap
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Nuxt frontend with mock data | ✅ [handover](docs/handover/phase-1.md) |
-| 2 | Spring Boot GraphQL + PostgreSQL: catalog, rentals (EXCLUDE constraint), authoritative auction engine, live updates | ⏳ |
+| 2 | Spring Boot GraphQL + PostgreSQL: catalog, rentals (EXCLUDE constraint), authoritative auction engine, live updates | ✅ [handover](docs/handover/phase-2.md) |
 | 3 | Ledger, escrow, idempotency, Stripe test mode, webhooks, audit hash chain | ⏳ |
 | 4 | Auth0, rate limiting, Docker, CI, Kubernetes, OpenTofu | ⏳ |

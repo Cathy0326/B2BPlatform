@@ -1,0 +1,208 @@
+"""
+QuipMarket GraphQL API.
+
+Conventions
+- Money: every *Cents field is an integer number of US cents (Long). Never a float.
+- Time: DateTime = ISO-8601 instant in UTC ("2026-10-04T08:30:00Z"); Date = calendar day ("2026-10-04").
+- Expected business outcomes (a bid that is too low) come back as DATA (BidResult.accepted=false).
+  Unexpected or invalid requests (unknown id, overlapping booking) come back as GraphQL ERRORS
+  with extensions.code, e.g. BOOKING_CONFLICT, NOT_REGISTERED, NOT_FOUND, UNAUTHENTICATED.
+"""
+scalar Long
+scalar DateTime
+scalar Date
+
+type Query {
+    "Equipment matching the filter, newest first by default."
+    equipment(filter: EquipmentFilter): [Equipment!]!
+    equipmentById(id: ID!): Equipment
+
+    auctions(status: AuctionStatus): [Auction!]!
+    auction(id: ID!): Auction
+    "The caller's deposit hold for an auction, if they registered."
+    myRegistration(auctionId: ID!): Registration
+
+    "Cheapest day/week/month combination for a rental. Does not reserve anything."
+    rentalQuote(equipmentId: ID!, start: Date!, end: Date!): RentalQuote!
+    loanQuote(input: LoanInput!): LoanQuote!
+}
+
+type Mutation {
+    "Reserve equipment for [start, end). Fails with BOOKING_CONFLICT if the dates overlap another booking."
+    createBooking(input: CreateBookingInput!): Booking!
+    "Hold the refundable deposit required to bid. Idempotent: calling twice returns the same hold."
+    registerToBid(auctionId: ID!): Registration!
+    "Submit a proxy bid: the system bids for you up to maxCents."
+    placeBid(auctionId: ID!, maxCents: Long!): BidResult!
+}
+
+type Subscription {
+    "Pushes the auction every time its state changes (new bid, soft-close extension)."
+    auctionUpdated(auctionId: ID!): Auction!
+}
+
+# ---------- catalog ----------
+
+enum Category { EXCAVATOR BULLDOZER WHEEL_LOADER SKID_STEER CRANE BACKHOE }
+enum ListingType { SALE RENT BOTH }
+enum ListingFilter { ANY SALE RENT }
+enum EquipmentSort { NEWEST PRICE_ASC PRICE_DESC HOURS_ASC }
+
+input EquipmentFilter {
+    search: String
+    categories: [Category!]
+    listing: ListingFilter = ANY
+    maxSalePriceCents: Long
+    minYear: Int
+    maxHours: Int
+    location: String
+    sort: EquipmentSort = NEWEST
+}
+
+type Equipment {
+    id: ID!
+    title: String!
+    category: Category!
+    make: String!
+    model: String!
+    year: Int!
+    hours: Int!
+    location: String!
+    listingType: ListingType!
+    salePriceCents: Long
+    rentalRates: RentalRates
+    description: String!
+    specs: [Spec!]!
+    "Resolved by the rental module (batched: one query for a whole list)."
+    bookings: [Booking!]!
+    "Resolved by the auction module (batched)."
+    activeAuction: Auction
+}
+
+type Spec { name: String!, value: String! }
+
+type RentalRates {
+    dailyCents: Long!
+    weeklyCents: Long!
+    "One rental month = 28 days."
+    monthlyCents: Long!
+}
+
+# ---------- rental ----------
+
+type Booking {
+    id: ID
+    "Pick-up day (inclusive)."
+    start: Date!
+    "Return day (exclusive): the machine is free again on this day."
+    end: Date!
+}
+
+input CreateBookingInput {
+    equipmentId: ID!
+    start: Date!
+    end: Date!
+}
+
+type RentalQuote {
+    rentalDays: Int!
+    totalCents: Long!
+    months: Int!
+    weeks: Int!
+    days: Int!
+    naiveDailyCents: Long!
+    savingsCents: Long!
+    available: Boolean!
+    conflicts: [Booking!]!
+    "Earliest start >= requested start with no conflict for the same length."
+    nextAvailableStart: Date!
+}
+
+# ---------- auction ----------
+
+enum AuctionStatus { UPCOMING LIVE ENDED }
+enum BidRejection { NOT_STARTED ENDED TOO_LOW NOT_ABOVE_OWN_MAX }
+
+type Auction {
+    id: ID!
+    "Resolved with @BatchMapping, so a list of N auctions costs 1 extra query, not N."
+    equipment: Equipment!
+    status: AuctionStatus!
+    startingPriceCents: Long!
+    depositCents: Long!
+    hasReserve: Boolean!
+    reserveMet: Boolean!
+    startsAt: DateTime!
+    endsAt: DateTime!
+    softCloseSeconds: Int!
+    currentPriceCents: Long!
+    minimumNextBidCents: Long!
+    leaderId: String
+    "Only visible to the current leader; null for everyone else."
+    myMaxCents: Long
+    extensions: Int!
+    bidCount: Int!
+    bids(last: Int = 20): [Bid!]!
+    "Present once the auction has ended."
+    result: AuctionResult
+}
+
+type Bid {
+    bidderId: String!
+    amountCents: Long!
+    "True when placed automatically from someone's max (proxy)."
+    auto: Boolean!
+    at: DateTime!
+}
+
+type AuctionResult {
+    sold: Boolean!
+    winnerId: String
+    hammerPriceCents: Long
+}
+
+type BidResult {
+    accepted: Boolean!
+    reason: BidRejection
+    minimumCents: Long
+    leading: Boolean!
+    extended: Boolean!
+    auction: Auction!
+}
+
+enum RegistrationStatus { HELD RELEASED APPLIED }
+
+type Registration {
+    auctionId: ID!
+    bidderId: String!
+    depositCents: Long!
+    status: RegistrationStatus!
+    createdAt: DateTime!
+}
+
+# ---------- financing ----------
+
+input LoanInput {
+    priceCents: Long!
+    downPaymentCents: Long!
+    "Annual rate in basis points: 7.25% = 725."
+    aprBps: Int!
+    termMonths: Int!
+}
+
+type LoanQuote {
+    principalCents: Long!
+    monthlyPaymentCents: Long!
+    totalInterestCents: Long!
+    totalPaidCents: Long!
+    totalCostCents: Long!
+    schedule: [AmortizationRow!]!
+}
+
+type AmortizationRow {
+    month: Int!
+    paymentCents: Long!
+    principalCents: Long!
+    interestCents: Long!
+    balanceCents: Long!
+}

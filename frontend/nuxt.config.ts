@@ -24,6 +24,8 @@ export default defineNuxtConfig({
       // Empty = use the in-browser mock data (Phase 1).
       // Set NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql to use the Spring Boot API (Phase 2).
       graphqlUrl: '',
+      // Optional; derived from graphqlUrl (http -> ws, /graphql -> /graphql-ws) when empty.
+      graphqlWsUrl: '',
     },
   },
 })

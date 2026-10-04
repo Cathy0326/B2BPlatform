@@ -62,7 +62,7 @@ export function useAuctionRoom(auctionId: string) {
   const msToStart = computed(() => (auction.value ? Math.max(0, auction.value.startsAt - now.value) : 0))
   const minimumNext = computed(() => (auction.value ? minimumNextBidCents(auction.value) : 0))
   const isLeader = computed(() => auction.value?.leaderId === user.value.id)
-  const hasReserve = computed(() => auction.value?.reservePriceCents != null)
+  const hasReserve = computed(() => auction.value?.server?.hasReserve ?? auction.value?.reservePriceCents != null)
   const isReserveMet = computed(() => (auction.value ? reserveMet(auction.value) : false))
   const result = computed(() => (auction.value && now.value ? settleResult(auction.value, now.value) : null))
   const myMax = computed(() => (isLeader.value ? auction.value?.leaderMaxCents ?? null : null))
