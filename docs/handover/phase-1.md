@@ -59,7 +59,7 @@ The site runs in mock mode, so no backend is needed. `frontend/wrangler.jsonc` h
    | Project name | `quipmarket` (must match `name` in `wrangler.jsonc`) |
    | Build command | `npm run build:cloudflare` |
    | Deploy command | `npx wrangler deploy` |
-   | Preview command | keep the default (`npx wrangler preview`) |
+   | Preview command | keep the default (`npx wrangler preview`); it builds a preview URL for every non-production branch and needs the `previews` block in `wrangler.jsonc` |
    | Advanced settings → Path | `frontend` |
    | API token | keep *Create new token* |
    | Variables | none for mock mode |
