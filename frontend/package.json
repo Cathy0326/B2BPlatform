@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "build:cloudflare": "NITRO_PRESET=cloudflare_module nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "test": "vitest run",

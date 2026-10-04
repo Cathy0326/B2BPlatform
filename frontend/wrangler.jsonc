@@ -1,0 +1,11 @@
+// Cloudflare Workers deployment (mock mode: no backend needed).
+// Workers Builds settings: Path = frontend · Build command = npm run build:cloudflare · Deploy command = npx wrangler deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "quipmarket",
+  "main": "./.output/server/index.mjs",
+  "assets": { "binding": "ASSETS", "directory": "./.output/public/" },
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true }
+}
