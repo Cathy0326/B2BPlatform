@@ -110,7 +110,7 @@ Run it locally with `docker compose --profile app up --build`. Practice twice wi
 - ❌ "Production system with real users / real payments" → ✅ "A production-style portfolio project; Stripe in **test mode**."
 - ❌ "High-frequency trading" → ✅ "Correctness under concurrent access, verified with race tests."
 - ❌ "Deployed on Kubernetes" (unless you actually ran `tofu apply`) → ✅ "Kubernetes manifests and OpenTofu, validated in CI."
-- ❌ "The live demo is the full system" → ✅ "The live demo is the frontend in mock mode on Cloudflare Workers; the full stack (Spring Boot, PostgreSQL, Stripe test mode) runs with Docker Compose."
+- ❌ "The live demo is the full system" → ✅ "The live demo runs the frontend on Cloudflare Workers, with auctions, escrow and the ledger simulated in the browser using the same rules as the backend; the full stack (Spring Boot, PostgreSQL, Stripe test mode) runs with Docker Compose and is deployed to a kind cluster in CI."
 - ❌ "I wrote every line alone without tools" → ✅ "I built it with AI assistance and can explain and modify every part." (Then make sure you can: do the drills in each handover doc.)
 
 ---

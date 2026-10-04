@@ -4,7 +4,7 @@
 
 **Heavy-equipment auctions, rentals & escrow settlement**, a B2B marketplace where bids can't race, bookings can't double-book, and every dollar is traceable through a double-entry ledger.
 
-**Live demo:** [quipmarket.cathyyue0326.workers.dev](https://quipmarket.cathyyue0326.workers.dev) (frontend in mock mode, running on Cloudflare Workers; the full stack runs locally with Docker Compose)
+**Live demo:** [quipmarket.cathyyue0326.workers.dev](https://quipmarket.cathyyue0326.workers.dev) (Cloudflare Workers; auctions, escrow deals and the ledger are simulated in your browser with the same rules as the backend; the full stack runs locally with Docker Compose)
 
 | Live auction | Escrow deal | Ledger & audit |
 |---|---|---|
