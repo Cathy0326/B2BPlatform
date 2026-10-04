@@ -9,6 +9,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "test": "vitest run",
+    "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=reports/junit.xml",
     "test:watch": "vitest",
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare"
@@ -22,6 +23,7 @@
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.3",
     "typescript": "~5.9.3",
     "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12"

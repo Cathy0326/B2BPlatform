@@ -29,8 +29,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:ci   # unit tests + JUnit XML + coverage, for the quality report
       - run: npm run build
+      - name: Upload test and coverage reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-reports
+          path: frontend/reports
 
   backend:
     name: Backend (unit + Testcontainers integration tests)
@@ -45,15 +51,49 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
-      - run: ./mvnw -B verify
-      - name: Upload test reports on failure
-        if: failure()
+      - run: ./mvnw -B verify   # also writes the JaCoCo coverage report (unit + integration merged)
+      - name: Upload test and coverage reports
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: backend-test-reports
+          name: backend-reports
           path: |
             backend/target/surefire-reports
             backend/target/failsafe-reports
+            backend/target/site/jacoco
+
+  quality:
+    name: Quality report (pass rate + coverage)
+    # Runs even when tests fail, so the report shows WHICH tests failed and the pass rate drops.
+    needs: [frontend, backend]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # used only on main, to publish the README badge data to the "badges" branch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-reports
+          path: frontend/reports
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-reports
+          path: backend/target
+        continue-on-error: true
+      - name: Write the report to the run summary
+        run: python3 scripts/quality-report.py --badges badges >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish badge data (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: badges
+        run: |
+          # An orphan branch holding only three small JSON files; force-pushed so it never grows.
+          git init -q -b badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -q -m "Quality badges for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" badges
 
   infrastructure:
     name: Validate Kubernetes manifests and OpenTofu
