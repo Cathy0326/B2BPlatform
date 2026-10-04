@@ -1,6 +1,6 @@
 # QuipMarket
 
-[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml)
+[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml) [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/tests.json)](docs/QUALITY.md) [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-backend.json)](docs/QUALITY.md) [![Frontend logic coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-frontend.json)](docs/QUALITY.md)
 
 **Heavy-equipment auctions, rentals & escrow settlement**, a B2B marketplace where bids can't race, bookings can't double-book, and every dollar is traceable through a double-entry ledger.
 
@@ -63,11 +63,24 @@ cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
 
 **Tests:**
 ```bash
-cd frontend && npm test && npm run typecheck     # 81 unit tests
-cd backend  && ./mvnw verify                     # 41 unit + 41 Testcontainers integration tests
+cd frontend && npm test && npm run typecheck     # 81 unit tests (npm run test:ci adds coverage)
+cd backend  && ./mvnw verify                     # 41 unit + 41 Testcontainers integration tests + JaCoCo coverage
 ```
 
 Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover docs.
+
+## Quality
+
+**163 automated tests, 100% passing on `main`** · backend line coverage **80%** (unit + integration) · frontend logic coverage **77%** · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
+
+```
+  kind deploy + smoke test      1   real Kubernetes: probes, cluster DNS, SSR → API → PostgreSQL
+  browser click-through             Playwright on the Cloudflare build
+  integration (Testcontainers)  41  real PostgreSQL 16, 50-thread race tests, GraphQL API
+  unit (JUnit + Vitest)        122  ledger rules, audit hash chain, pricing, auction engine
+```
+
+Each CI run's *Summary* tab shows the full report: pass rate per suite, failing tests by name, and coverage per module. See [docs/QUALITY.md](docs/QUALITY.md) for the approach, and for how it maps to testing practices common at financial and trading firms.
 
 ## Documentation
 
@@ -77,6 +90,7 @@ Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover
 | [Phase 2](docs/handover/phase-2.md) | Spring Boot GraphQL + PostgreSQL, concurrency, N+1, subscriptions |
 | [Phase 3](docs/handover/phase-3.md) | Payments (Stripe), escrow saga, double-entry ledger, idempotency, webhooks, audit chain |
 | [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
+| [Quality](docs/QUALITY.md) | Test pyramid, pass rate and coverage, how bugs become tests, enterprise testing practices |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
 
 **Related:** [order-book-engine](https://github.com/Cathy0326/order-book-engine), a Java 21 limit order book matching engine with differential testing and JMH/HdrHistogram latency measurements.
