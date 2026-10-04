@@ -111,6 +111,7 @@ Run it locally with `docker compose --profile app up --build`. Practice twice wi
 - ❌ "Production system with real users / real payments" → ✅ "A production-style portfolio project; Stripe in **test mode**."
 - ❌ "High-frequency trading" → ✅ "Correctness under concurrent access, verified with race tests."
 - ❌ "Deployed on Kubernetes" (unless you actually ran `tofu apply`) → ✅ "Kubernetes manifests and OpenTofu, validated in CI."
+- ❌ "The live demo is the full system" → ✅ "The live demo runs the frontend on Cloudflare Workers, with auctions, escrow and the ledger simulated in the browser using the same rules as the backend; the full stack (Spring Boot, PostgreSQL, Stripe test mode) runs with Docker Compose and is deployed to a kind cluster in CI."
 - ❌ "I wrote every line alone without tools" → ✅ "I built it with AI assistance and can explain and modify every part." (Then make sure you can: do the drills in each handover doc.)
 
 ---
@@ -119,7 +120,7 @@ Run it locally with `docker compose --profile app up --build`. Practice twice wi
 
 > Hi MassQuip team,
 >
-> I built a working demo of a heavy-equipment marketplace on your exact stack (**Nuxt** frontend, **Spring Boot + GraphQL** modular monolith, **PostgreSQL/Flyway**, **Auth0**, Docker/Kubernetes, OpenTofu for Linode): **[live demo link]** · **[GitHub link]**
+> I built a working demo of a heavy-equipment marketplace on your exact stack (**Nuxt** frontend, **Spring Boot + GraphQL** modular monolith, **PostgreSQL/Flyway**, **Auth0**, Docker/Kubernetes, OpenTofu for Linode): **https://quipmarket.cathyyue0326.workers.dev** · **https://github.com/Cathy0326/B2BPlatform**
 >
 > It covers live auctions with proxy bidding, rentals with double-booking prevention, and escrow payments through Stripe test mode, with a double-entry ledger. The repo has CI with Testcontainers, Kubernetes manifests with probes, and OpenTofu for LKE + managed Postgres + Cloudflare.
 >
@@ -144,7 +145,7 @@ Lead with QuipMarket for full-stack and payments roles (MassQuip, Stripe, Fideli
 
 ## 9. Where to go next
 
-1. **Deploy the frontend demo** (Cloudflare Pages, mock mode, free) and put the link in the README and proposals.
+1. ✅ **Frontend demo deployed** on Cloudflare Workers (mock mode, free): https://quipmarket.cathyyue0326.workers.dev
 2. Do the **break-it drills** in each handover doc and in `order-book-engine/docs/LEARNING.md` until you can explain every failure without notes.
 3. Pin both repositories on your GitHub profile.
 4. Keep NeetCode practice daily. Projects get you interviews, and online assessments decide them.
