@@ -2,7 +2,9 @@ package com.quipmarket.ledger.internal;
 
 import com.quipmarket.audit.AuditTrail;
 import com.quipmarket.ledger.Ledger;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,19 +107,22 @@ class JdbcLedger implements Ledger {
                 """.formatted(where)).param("n", Math.max(1, Math.min(limit, 500)));
         if (reference != null) spec = spec.param("ref", reference);
 
-        Map<Long, Entry> byId = new LinkedHashMap<>();
+        // One row per journal LINE. Collect headers and lines separately, then build each immutable Entry once
+        // (Entry copies its list, so appending to it after construction is impossible by design).
+        record Header(long id, String kind, String reference, String description, Instant createdAt) {}
+        Map<Long, Header> headers = new LinkedHashMap<>();
+        Map<Long, List<Line>> lines = new HashMap<>();
         spec.query(rs -> {
             long id = rs.getLong("id");
-            Entry e = byId.computeIfAbsent(id, k -> {
-                try {
-                    return new Entry(k, rs.getString("kind"), rs.getString("reference"), rs.getString("description"),
-                            rs.getTimestamp("created_at").toInstant(), new ArrayList<>());
-                } catch (java.sql.SQLException ex) {
-                    throw new IllegalStateException(ex);
-                }
-            });
-            e.lines().add(new Line(rs.getString("account_code"), rs.getLong("debit_cents"), rs.getLong("credit_cents")));
+            if (!headers.containsKey(id)) {
+                headers.put(id, new Header(id, rs.getString("kind"), rs.getString("reference"), rs.getString("description"),
+                        rs.getTimestamp("created_at").toInstant()));
+            }
+            lines.computeIfAbsent(id, k -> new ArrayList<>())
+                    .add(new Line(rs.getString("account_code"), rs.getLong("debit_cents"), rs.getLong("credit_cents")));
         });
-        return byId.values().stream().map(e -> new Entry(e.id(), e.kind(), e.reference(), e.description(), e.createdAt(), List.copyOf(e.lines()))).toList();
+        return headers.values().stream()
+                .map(h -> new Entry(h.id(), h.kind(), h.reference(), h.description(), h.createdAt(), lines.get(h.id())))
+                .toList();
     }
 }

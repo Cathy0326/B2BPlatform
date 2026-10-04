@@ -18,7 +18,7 @@ const { login, logout } = useAuth()
     <header class="site-header">
       <div class="container header-inner">
         <NuxtLink to="/" class="logo" aria-label="QuipMarket home">
-          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <img src="/favicon.svg" alt="" width="28" height="28" >
           <span>Quip<strong>Market</strong></span>
         </NuxtLink>
         <nav aria-label="Main">

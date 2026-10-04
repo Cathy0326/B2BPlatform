@@ -18,8 +18,8 @@ const fmtDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString
     </div>
 
     <div class="dates">
-      <label class="field">Pick-up<input v-model="r.start.value" type="date" :min="today" /></label>
-      <label class="field">Return<input v-model="r.end.value" type="date" :min="r.start.value" /></label>
+      <label class="field">Pick-up<input v-model="r.start.value" type="date" :min="today" ></label>
+      <label class="field">Return<input v-model="r.end.value" type="date" :min="r.start.value" ></label>
     </div>
 
     <div v-if="r.dateError.value" class="alert alert-error">{{ r.dateError.value }}</div>

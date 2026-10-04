@@ -106,7 +106,7 @@ function submit() {
               autocomplete="off"
               :placeholder="(minimumNext / 100).toLocaleString('en-US')"
               :aria-invalid="!!inputError"
-            />
+            >
           </div>
         </label>
         <p v-if="inputError" class="subtle err">{{ inputError }}</p>

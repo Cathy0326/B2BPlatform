@@ -2,6 +2,8 @@
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   devtools: { enabled: true },
+  // Lint rules generated for this project's structure; `npm run lint` uses eslint.config.mjs.
+  modules: ['@nuxt/eslint'],
   css: ['~/assets/css/main.css'],
   typescript: { strict: true },
 

@@ -58,7 +58,9 @@ public class Idempotency {
                     .param("u", userId).param("k", key)
                     .query((rs, i) -> new String[] {rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4)})
                     .single();
-            if (!existing[0].equals(operation) || !existing[1].equals(requestHash)) throw new KeyReused();
+            // Constant-time comparison: how long the check takes must not reveal how much of the hash matched.
+            boolean sameRequest = MessageDigest.isEqual(existing[1].getBytes(StandardCharsets.UTF_8), requestHash.getBytes(StandardCharsets.UTF_8));
+            if (!existing[0].equals(operation) || !sameRequest) throw new KeyReused();
             if ("IN_PROGRESS".equals(existing[2])) throw new InProgress();
             return json.readValue(existing[3], responseType);
         }

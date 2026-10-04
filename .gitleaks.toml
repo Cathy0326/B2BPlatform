@@ -1,0 +1,10 @@
+# gitleaks: scans the whole git history for committed secrets (keys, tokens, passwords).
+# The default rules stay on; allowlists below are narrow and each needs a reason.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fake Stripe webhook secret used only by the integration tests to sign test webhooks"
+condition = "AND"   # both the exact value AND the exact file must match; any other secret is still reported
+paths = ['''backend/src/test/java/com/quipmarket/support/IntegrationTest\.java''']
+regexes = ['''whsec_test_0123456789abcdef''']

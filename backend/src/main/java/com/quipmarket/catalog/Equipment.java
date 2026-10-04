@@ -18,6 +18,10 @@ public record Equipment(
         String description,
         List<Spec> specs) {
 
+    public Equipment {
+        specs = specs == null ? List.of() : List.copyOf(specs);
+    }
+
     public enum Category { EXCAVATOR, BULLDOZER, WHEEL_LOADER, SKID_STEER, CRANE, BACKHOE }
 
     public enum ListingType { SALE, RENT, BOTH }

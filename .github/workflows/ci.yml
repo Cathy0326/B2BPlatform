@@ -29,6 +29,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint      # ESLint, zero warnings allowed
       - run: npm run test:ci   # unit tests + JUnit XML + coverage, for the quality report
       - run: npm run build
       - name: Upload test and coverage reports

@@ -25,7 +25,11 @@ public final class AuctionEngine {
     public sealed interface Outcome permits Accepted, Rejected {}
 
     /** @param newBids visible bids produced by this submission, in order */
-    public record Accepted(AuctionState state, List<VisibleBid> newBids, boolean leading, boolean extended) implements Outcome {}
+    public record Accepted(AuctionState state, List<VisibleBid> newBids, boolean leading, boolean extended) implements Outcome {
+        public Accepted {
+            newBids = List.copyOf(newBids);
+        }
+    }
 
     public record Rejected(Rejection reason, Long minimumCents) implements Outcome {}
 

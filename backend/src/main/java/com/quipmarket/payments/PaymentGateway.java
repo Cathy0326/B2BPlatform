@@ -16,7 +16,11 @@ public interface PaymentGateway {
      * @param captureLater    true = authorize only (a hold); false = charge now
      */
     record ChargeRequest(long amountCents, String currency, String paymentMethodId, boolean captureLater,
-                         String description, Map<String, String> metadata) {}
+                         String description, Map<String, String> metadata) {
+        public ChargeRequest {
+            metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+        }
+    }
 
     record Result(String providerRef, Payment.Status status, String clientSecret) {}
 

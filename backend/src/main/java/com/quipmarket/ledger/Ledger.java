@@ -34,7 +34,11 @@ public interface Ledger {
         }
     }
 
-    record Entry(long id, String kind, String reference, String description, Instant createdAt, List<Line> lines) {}
+    record Entry(long id, String kind, String reference, String description, Instant createdAt, List<Line> lines) {
+        public Entry {
+            lines = List.copyOf(lines); // a posted entry can never change, not even in memory
+        }
+    }
 
     record AccountBalance(String code, AccountType type, String name, long debitsCents, long creditsCents) {
         public long balanceCents() {
@@ -43,6 +47,10 @@ public interface Ledger {
     }
 
     record TrialBalance(List<AccountBalance> accounts, long totalDebitsCents, long totalCreditsCents) {
+        public TrialBalance {
+            accounts = List.copyOf(accounts);
+        }
+
         public boolean balanced() {
             return totalDebitsCents == totalCreditsCents;
         }
