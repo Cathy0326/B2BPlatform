@@ -24,11 +24,12 @@ python3 scripts/quality-report.py      # prints the same report CI shows
 
 | Metric | Value |
 |---|---|
-| Automated tests | **163**: 41 backend unit + 41 backend integration + 81 frontend unit |
+| Automated tests | **256**: 78 backend unit + 69 backend integration + 109 frontend unit |
 | Pass rate on `main` | **100%** (CI blocks merging anything red) |
-| Backend line coverage (JaCoCo, unit + integration) | **80.0%** (1,135 / 1,418 lines) |
-| Backend branch coverage | **59.8%**: error paths are the main gap |
-| Frontend logic coverage (`utils/` + `services/`, Vitest v8) | **77.3%** lines, 72.5% branches |
+| Backend line coverage (JaCoCo, unit + integration) | **93.7%** (1,331 / 1,420 lines) |
+| Backend branch coverage | **85.3%** |
+| Frontend logic coverage (`utils/` + `services/`, Vitest v8) | **99.0%** lines, 88.8% branches, 96.8% functions |
+| Quality gate (CI fails below) | backend lines 90% / branches 83% · frontend lines 95% / branches 85% / functions 90% |
 | Concurrency tests | 50 threads × 10 rounds (bookings), 40 threads (bids) |
 | Deployment test | Every push deploys the stack to a throwaway Kubernetes (kind) cluster and smoke-tests it |
 
@@ -36,7 +37,24 @@ The frontend number covers the logic layer only, on purpose: pages and component
 
 **Reading the numbers honestly:** coverage tells you which code ran during tests, not whether the tests check the right things. That is why the most important tests here were also checked the other way round: remove the protection (the booking lock, the bid row lock), and the test must turn red. Mutation testing (Q2) turns that habit into a measured score.
 
-## 3. The test pyramid
+## 3. How coverage went from 80% / 60% to 94% / 85%
+
+Every metric under 80% was raised with tests of real behaviour, not by excluding code from the measurement. The only code still effectively untested is the 3-line `main()` method and a few defensive `catch` blocks for exceptions the JVM never throws in practice (for example, SHA-256 being unavailable).
+
+| Metric | Before | After | What was added |
+|---|---|---|---|
+| Backend branches | 59.8% | **85.3%** | Error paths: invalid money/date input, wrong deal state, declined and 3-D Secure payments, retries that must not charge twice, missing login, other users' data |
+| Backend lines | 80.0% | **93.7%** | Demo lots and rival bots in an isolated Spring context, the background settlement job, every equipment search filter |
+| Frontend lines | 77.3% | **99.0%** | GraphQL clients tested against a fake network (rate limit, expired login, error codes, Idempotency-Key), in-browser auction and equipment "servers" |
+| Frontend branches | 72.5% | **88.8%** | Same tests, plus the bots' start/stop behaviour with fake timers |
+| Frontend functions | 64.7% | **96.8%** | |
+
+Things the new tests confirmed or taught along the way:
+- Cancelling an already captured payment throws ("refund instead") instead of silently doing nothing. That is the safer design, and a test now requires it.
+- When the demo cleanup deletes a finished lot, reseeding immediately reuses its friendly id; the test checks the lot was *replaced* (its end time moves to the new clock).
+- Each call to the rate limiter's buffered request returns a fresh stream, so every reader gets the whole body.
+
+## 4. The test pyramid
 
 ```
                       ▲ slower · fewer · closer to production
@@ -45,9 +63,9 @@ The frontend number covers the logic layer only, on purpose: pages and component
           ┌─┴──────────────────────┴─┐
           │ browser click-through     │  Playwright on the Cloudflare build (scripted; CI in Q2)
         ┌─┴──────────────────────────┴─┐
-        │ integration (Testcontainers)   │  41 · real PostgreSQL 16 · race tests · GraphQL API
+        │ integration (Testcontainers)   │  69 · real PostgreSQL 16 · race tests · GraphQL API · demo bots
       ┌─┴──────────────────────────────┴─┐
-      │ unit (JUnit, Vitest)               │  122 · ledger rules, audit chain, pricing, auctions
+      │ unit (JUnit, Vitest)               │  187 · ledger rules, audit chain, pricing, auctions, API clients
       └────────────────────────────────────┘
                       ▼ faster · many · cheap
 ```
@@ -61,7 +79,7 @@ What each layer catches that the one below cannot:
 | Browser | The "Pay balance" button calls the API correctly, but the page does not refresh |
 | Deployment | The manifests work in Docker Compose but the frontend pod cannot resolve the backend's DNS name |
 
-## 4. How a bug becomes a permanent test
+## 5. How a bug becomes a permanent test
 
 ```
  CI fails (even once) ─► reproduce it on purpose ─► find the root cause ─► fix
@@ -71,17 +89,17 @@ What each layer catches that the one below cannot:
 
 Real example: the 50-thread booking test failed once on `main` with `deadlock detected`. A 30-round stress test reproduced it in 8 rounds. The cause was that PostgreSQL checks exclusion constraints after the insert, so two simultaneous inserts can wait for each other. A per-machine advisory lock fixed it (0 of 30 rounds afterwards), and the CI test now runs 10 rounds and fails when the lock is removed. Details are in [Phase 2, bug #6](handover/phase-2.md).
 
-## 5. Practices common at financial and trading firms, and where this project stands
+## 6. Practices common at financial and trading firms, and where this project stands
 
 Large regulated firms (asset managers such as Fidelity) and trading firms (such as SIG) tend to emphasize different things. Regulated firms care most about auditability, security scanning and quality gates. Trading firms care most about correctness under concurrency, edge cases and performance. The tools below are the ones that appear most often in job descriptions and engineering write-ups in this space; they are typical examples, not a claim about any company's internal stack.
 
 | Practice | Why it matters in finance | Typical tools | This project |
 |---|---|---|---|
-| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 122 unit tests |
-| Integration tests with real dependencies | Mocks hide SQL, transaction and locking bugs | Testcontainers | ✅ 41 tests on real PostgreSQL |
+| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 187 unit tests |
+| Integration tests with real dependencies | Mocks hide SQL, transaction and locking bugs | Testcontainers | ✅ 69 tests on real PostgreSQL |
 | Concurrency / race testing | Double spending and double booking are race conditions | Multi-thread tests, jcstress | ✅ 50-thread and 40-thread race tests |
 | Code coverage | A visible floor for untested code | JaCoCo, Istanbul/v8, SonarQube | ✅ JaCoCo + v8, shown on every run |
-| Quality gate | Merges blocked when quality drops | SonarQube gates, coverage thresholds | 🔜 Q2: fail CI below a coverage floor |
+| Quality gate | Merges blocked when quality drops | SonarQube gates, coverage thresholds | ✅ JaCoCo + Vitest thresholds fail CI below the floor |
 | Static analysis | Catches bug patterns before tests run | SonarQube, SpotBugs, Error Prone, ESLint | 🔜 Q2 |
 | Security scanning | Regulators expect SAST, dependency and secret scanning | CodeQL, OWASP Dependency-Check, Dependabot, Trivy, gitleaks | 🔜 Q2 |
 | End-to-end browser tests | The user's path works, not only the API | Playwright, Selenium, Cypress | ✅ scripted · 🔜 Q2 in CI, with accessibility checks (axe) |
@@ -94,10 +112,10 @@ Large regulated firms (asset managers such as Fidelity) and trading firms (such 
 | Contract tests | Frontend and backend agree on the API | Pact, GraphQL schema checks | 💡 later |
 | Audit trail | Regulators require tamper evidence | Append-only logs, hash chains | ✅ SHA-256 hash chain, tamper tests |
 
-## 6. Next stage (Q2)
+## 7. Next stage (Q2)
 
 1. **Security scanning:** CodeQL (code), Dependabot (dependencies), Trivy (container images), gitleaks (secrets).
-2. **Quality gates:** fail CI if coverage drops below the current floor; static analysis (SpotBugs for Java, ESLint for TypeScript).
+2. **Static analysis:** SpotBugs for Java, ESLint for TypeScript (the coverage gate is already in place).
 3. **Property-based tests:** jqwik for the ledger (any random sequence of postings stays balanced) and fast-check for pricing.
 4. **Mutation testing:** PIT on the ledger, escrow and rental modules, with the score in the quality report.
 5. **Browser tests in CI:** the Playwright click-through as a CI job, plus axe accessibility checks.

@@ -63,21 +63,21 @@ cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
 
 **Tests:**
 ```bash
-cd frontend && npm test && npm run typecheck     # 81 unit tests (npm run test:ci adds coverage)
-cd backend  && ./mvnw verify                     # 41 unit + 41 Testcontainers integration tests + JaCoCo coverage
+cd frontend && npm test && npm run typecheck     # 109 unit tests (npm run test:ci adds coverage + the coverage gate)
+cd backend  && ./mvnw verify                     # 78 unit + 69 Testcontainers integration tests + JaCoCo coverage gate
 ```
 
 Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover docs.
 
 ## Quality
 
-**163 automated tests, 100% passing on `main`** · backend line coverage **80%** (unit + integration) · frontend logic coverage **77%** · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
+**256 automated tests, 100% passing on `main`** · backend coverage **94% lines / 85% branches** (unit + integration) · frontend logic coverage **99% lines / 89% branches** · CI fails if coverage drops below its floor · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
 
 ```
   kind deploy + smoke test      1   real Kubernetes: probes, cluster DNS, SSR → API → PostgreSQL
   browser click-through             Playwright on the Cloudflare build
-  integration (Testcontainers)  41  real PostgreSQL 16, 50-thread race tests, GraphQL API
-  unit (JUnit + Vitest)        122  ledger rules, audit hash chain, pricing, auction engine
+  integration (Testcontainers)  69  real PostgreSQL 16, 50-thread race tests, GraphQL API, demo bots
+  unit (JUnit + Vitest)        187  ledger rules, audit hash chain, pricing, auction engine, payments, API clients
 ```
 
 Each CI run's *Summary* tab shows the full report: pass rate per suite, failing tests by name, and coverage per module. See [docs/QUALITY.md](docs/QUALITY.md) for the approach, and for how it maps to testing practices common at financial and trading firms.

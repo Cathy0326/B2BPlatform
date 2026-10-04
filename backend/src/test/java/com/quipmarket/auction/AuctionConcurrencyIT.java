@@ -109,4 +109,25 @@ class AuctionConcurrencyIT {
             clock.advance(Duration.ofMinutes(-5));
         }
     }
+
+    @Test
+    void depositRulesGateRegistrationAndBidding() {
+        Instant now = clock.instant();
+        String ended = "it-ended-" + System.nanoTime();
+        auctions.create(new AuctionState(ended, "eq-1002", 15_000_000, null, 1_500_000, now.minusSeconds(7_200),
+                now.minusSeconds(60), 120, 15_000_000, null, null, 0));
+        assertThatThrownBy(() -> auctions.register(ended, "gina", null))
+                .isInstanceOf(com.quipmarket.shared.DomainException.InvalidInput.class).hasMessageContaining("ended");
+
+        String lot = newLot("it-gate-" + System.nanoTime());
+        // 3-D Secure not finished: the hold is not real yet, so no bidding.
+        assertThat(auctions.register(lot, "hank", "pm_card_authenticationRequired").status()).isEqualTo(Registration.Status.PENDING);
+        assertThatThrownBy(() -> auctions.placeBid(lot, "hank", 16_000_000))
+                .isInstanceOf(NotRegisteredException.class).hasMessageContaining("not complete");
+
+        // A released hold (the money was given back) cannot be used to bid either.
+        auctions.register(lot, "ivy", null);
+        jdbc.sql("UPDATE auction_registrations SET status = 'RELEASED' WHERE auction_id = :a AND bidder_id = 'ivy'").param("a", lot).update();
+        assertThatThrownBy(() -> auctions.placeBid(lot, "ivy", 16_000_000)).isInstanceOf(NotRegisteredException.class);
+    }
 }

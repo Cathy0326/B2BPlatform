@@ -38,6 +38,13 @@ class AuctionEngineTest {
         assertThat(AuctionEngine.increment(500_000)).isEqualTo(10_000);
         assertThat(AuctionEngine.increment(5_000_000)).isEqualTo(50_000);
         assertThat(AuctionEngine.increment(80_000_000)).isEqualTo(250_000);
+        // Every tier, at its exact boundary (the first price that belongs to the next tier):
+        assertThat(AuctionEngine.increment(999_999)).isEqualTo(10_000);
+        assertThat(AuctionEngine.increment(1_000_000)).isEqualTo(25_000);
+        assertThat(AuctionEngine.increment(4_999_999)).isEqualTo(25_000);
+        assertThat(AuctionEngine.increment(10_000_000)).isEqualTo(100_000);
+        assertThat(AuctionEngine.increment(49_999_999)).isEqualTo(100_000);
+        assertThat(AuctionEngine.increment(50_000_000)).isEqualTo(250_000);
     }
 
     @Test
