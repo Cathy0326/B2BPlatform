@@ -1,5 +1,7 @@
 // Cloudflare Workers deployment (mock mode: no backend needed).
 // Workers Builds settings: Path = frontend · Build command = npm run build:cloudflare · Deploy command = npx wrangler deploy
+// On Cloudflare's builders Nitro generates .output/server/wrangler.json from this file and sets `main` and `assets`
+// itself (hence the "overridden" warnings in the build log); the values below are for a local `npx wrangler dev`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "quipmarket",
@@ -7,5 +9,7 @@
   "assets": { "binding": "ASSETS", "directory": "./.output/public/" },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Required by `npx wrangler preview`, which Workers Builds runs for non-production branches (PR previews).
+  "previews": {}
 }
