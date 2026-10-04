@@ -72,6 +72,46 @@ jobs:
           tofu init -backend=false
           tofu validate
 
+  kubernetes:
+    name: Deploy to a kind cluster + smoke test
+    # Applies the production manifests (k8s/base) to a throwaway Kubernetes cluster through the CI overlay,
+    # then checks the running stack end to end (k8s/overlays/ci/smoke-test.sh).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image (reuses the images job's layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: quipmarket-backend:ci
+          cache-from: type=gha,scope=backend
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          load: true
+          tags: quipmarket-frontend:ci
+          cache-from: type=gha,scope=frontend
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: quipmarket-ci
+      - name: Load images into the cluster
+        run: kind load docker-image quipmarket-backend:ci quipmarket-frontend:ci --name quipmarket-ci
+      - name: Deploy (kubectl apply -k k8s/overlays/ci)
+        run: kubectl apply -k k8s/overlays/ci
+      - name: Smoke test
+        run: k8s/overlays/ci/smoke-test.sh
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n quipmarket get pods -o wide
+          kubectl -n quipmarket get events --sort-by=.lastTimestamp | tail -40
+          kubectl -n quipmarket describe pods | tail -120
+          for d in postgres backend frontend; do echo "--- $d"; kubectl -n quipmarket logs deployment/$d --tail=150 || true; done
+
   images:
     name: Build container images (push to GHCR on main)
     needs: [frontend, backend]

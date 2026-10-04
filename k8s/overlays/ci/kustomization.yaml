@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# CI overlay: deploy the PRODUCTION manifests (../../base) into a throwaway kind cluster.
+# Differences from production, all at the edges:
+#   - PostgreSQL runs in the cluster (production: Linode managed PostgreSQL, created by OpenTofu)
+#   - demo profile, demo auth and simulated payments (production: Auth0 + Stripe, which CI cannot reach)
+#   - images are built in the CI job and loaded into kind instead of pulled from GHCR
+# Used by the "kubernetes" job in .github/workflows/ci.yml:  kubectl apply -k k8s/overlays/ci
+resources:
+  - ../../base
+  - postgres.yaml
+secretGenerator:
+  - name: backend-secrets
+    namespace: quipmarket
+    literals:
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/quipmarket
+      - DATABASE_USER=quipmarket
+      - DATABASE_PASSWORD=ci-only-password
+generatorOptions:
+  disableNameSuffixHash: true   # the base Deployments reference the Secret by its plain name
+patches:
+  - target: { kind: ConfigMap, name: backend-config }
+    patch: |-
+      - { op: replace, path: /data/SPRING_PROFILES_ACTIVE, value: demo }
+      - { op: replace, path: /data/AUTH_MODE, value: demo }
+      - { op: replace, path: /data/PAYMENTS_GATEWAY, value: simulated }
+      - { op: replace, path: /data/CORS_ALLOWED_ORIGINS, value: "http://localhost:3000" }
+  - target: { kind: ConfigMap, name: frontend-config }
+    patch: |-
+      - { op: replace, path: /data/NUXT_PUBLIC_GRAPHQL_URL, value: "http://localhost:8080/graphql" }
+      - { op: replace, path: /data/NUXT_PUBLIC_AUTH0_DOMAIN, value: "" }
+      - { op: replace, path: /data/NUXT_PUBLIC_AUTH0_CLIENT_ID, value: "" }
+      - { op: replace, path: /data/NUXT_PUBLIC_AUTH0_AUDIENCE, value: "" }
+  # No ingress controller or cert-manager in kind; the smoke test talks to the Services directly.
+  - target: { kind: Ingress, name: quipmarket }
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: quipmarket
+images:
+  - name: ghcr.io/cathy0326/quipmarket-backend
+    newName: quipmarket-backend
+    newTag: ci
+  - name: ghcr.io/cathy0326/quipmarket-frontend
+    newName: quipmarket-frontend
+    newTag: ci

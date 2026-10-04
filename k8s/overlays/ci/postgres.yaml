@@ -1,0 +1,39 @@
+# Stand-in for the managed PostgreSQL that OpenTofu creates on Linode. CI only: no volume, data dies with the pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: quipmarket
+  labels: { app: postgres }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          env:
+            - { name: POSTGRES_DB, value: quipmarket }
+            - { name: POSTGRES_USER, valueFrom: { secretKeyRef: { name: backend-secrets, key: DATABASE_USER } } }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: backend-secrets, key: DATABASE_PASSWORD } } }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "quipmarket", "-d", "quipmarket"] }
+            periodSeconds: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: quipmarket
+spec:
+  selector: { app: postgres }
+  ports:
+    - { name: postgres, port: 5432, targetPort: postgres }
