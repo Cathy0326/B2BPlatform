@@ -77,6 +77,8 @@ Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover
 | [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
 
+**Related:** [order-book-engine](https://github.com/Cathy0326/order-book-engine), a Java 21 limit order book matching engine with differential testing and JMH/HdrHistogram latency measurements.
+
 ## Roadmap
 
 | Phase | Scope | Status |
