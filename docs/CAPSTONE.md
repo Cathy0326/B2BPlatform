@@ -70,6 +70,8 @@
 - Guaranteed **zero double-bookings under concurrency** with a PostgreSQL exclusion constraint, verified by a 50-thread race test.
 - Serialized concurrent auction bids with row-level locking; demonstrated the **lost-update anomaly** by removing the lock and watching a 40-thread test fail.
 - Implemented **proxy bidding with price-time priority** and anti-sniping soft close; implemented the same engine in TypeScript and Java against shared test cases, including a 2,000-step randomized invariant test.
+- Built a **limit order book matching engine** in Java 21 ([order-book-engine](https://github.com/Cathy0326/order-book-engine)): price-time priority with TreeMap price levels and an intrusive FIFO for **O(1) cancel**, IOC/FOK, self-trade prevention; **≈7.7M commands/s** (JMH), p99 **1.4 µs** (HdrHistogram) on one thread.
+- Verified the engine with **differential testing** against a naive reference book (6 seeds × 20,000 random commands); a planted bug was caught at step 592. A single-writer sequencer journals commands, so replay reproduces a byte-identical SHA-256 session digest.
 
 ---
 
@@ -84,6 +86,7 @@
 | 5 | Production bug class: migrations | Seed data numbered V100 blocked a new V4 schema migration ("out of order") | Moved seed data to an idempotent repeatable `R__` migration | Any backend |
 | 6 | Subtle Spring bug | A method called on `this` silently skipped `@Transactional` (self-invocation) | Explicit TransactionTemplate; explained the proxy model | Java/Spring interviews |
 | 7 | Resilience to a third party | Public pages hung when Auth0 was unreachable | Switched to a non-blocking client; public data never waits on the identity provider | Stripe, MassQuip |
+| 8 | How do you trust an optimized matching engine? | Wrote a deliberately naive reference book with no shared code; both run the same seeded random flow and must emit identical events at every step | Planting a FOK bug fails 6 of 8 runs, and the message names the seed and step (order-book-engine) | SIG, any algorithms role |
 
 Tip: for each story, prepare **one number** (40 threads, 13 of 150 accepted, 82 tests) and **one trade-off** (pessimistic vs optimistic lock, LISTEN/NOTIFY vs Kafka).
 
@@ -125,9 +128,22 @@ Run it locally with `docker compose --profile app up --build`. Practice twice wi
 
 ---
 
-## 8. Where to go next
+## 8. Related project: order-book-engine
+
+**[Cathy0326/order-book-engine](https://github.com/Cathy0326/order-book-engine)** is the trading-systems companion to QuipMarket. QuipMarket shows concurrency correctness inside a database (row locks, exclusion constraints). The order book shows the in-memory version: a single-writer engine with no locks, plus data structures chosen for latency.
+
+| | QuipMarket | order-book-engine |
+|---|---|---|
+| Matching | Proxy bidding, one lot at a time | Continuous price-time matching, many price levels |
+| Concurrency | `SELECT … FOR UPDATE`, `EXCLUDE` constraint | Single writer thread behind a queue |
+| Correctness proof | 40–50-thread race tests | Differential test vs. a naive oracle, deterministic replay |
+| Performance story | No N+1 (statement-count test) | JMH throughput, HdrHistogram percentiles |
+
+Lead with QuipMarket for full-stack and payments roles (MassQuip, Stripe, Fidelity), and with order-book-engine for SIG and other trading firms. Its `docs/LEARNING.md` has its own pitch, drills and interview questions.
+
+## 9. Where to go next
 
 1. **Deploy the frontend demo** (Cloudflare Pages, mock mode, free) and put the link in the README and proposals.
-2. Do the **break-it drills** in each handover doc until you can explain every failure without notes.
-3. Optional SIG-style side project (from the original plan): an **order-book matching engine** in Java with JMH latency percentiles.
+2. Do the **break-it drills** in each handover doc and in `order-book-engine/docs/LEARNING.md` until you can explain every failure without notes.
+3. Pin both repositories on your GitHub profile.
 4. Keep NeetCode practice daily. Projects get you interviews, and online assessments decide them.
