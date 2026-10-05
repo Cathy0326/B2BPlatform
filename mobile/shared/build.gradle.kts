@@ -105,5 +105,8 @@ apollo {
         mapScalarToKotlinLong("Long")
         mapScalarToKotlinString("Date")
         mapScalarToKotlinString("DateTime")
+        // Generated types stay internal: callers use QuipMarketApi's own models, and exporting them to
+        // Objective-C would clash with built-in names (the generated `Long` scalar type vs. Kotlin's boxed Long).
+        generateAsInternal.set(true)
     }
 }
