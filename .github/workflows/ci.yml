@@ -101,10 +101,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # SOPS-encrypted Secrets (*.enc.yaml) carry a `sops:` metadata block that is not part of the Secret schema;
+      # the next step checks them instead (encrypted, and only there).
       - name: kubeconform (schema-validate k8s manifests)
         run: |
           docker run --rm -v "$PWD/k8s:/k8s" ghcr.io/yannh/kubeconform:latest \
-            -strict -summary -ignore-missing-schemas -skip Kustomization /k8s
+            -strict -summary -ignore-missing-schemas -skip Kustomization -ignore-filename-pattern '\.enc\.yaml$' /k8s
       - name: Secrets in Git are encrypted (SOPS), and only there
         run: |
           plain=$(grep -rl --include='*.yaml' '^kind: Secret' k8s | grep -v '\.enc\.yaml$' || true)
