@@ -92,6 +92,7 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
 | [Quality](docs/QUALITY.md) | Test pyramid, pass rate and coverage, security scanning and static analysis, enterprise testing practices |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
+| [Contributing](CONTRIBUTING.md) | ClickUp ↔ GitHub workflow: branch and commit naming, pull request template, definition of done |
 
 **Related:** [order-book-engine](https://github.com/Cathy0326/order-book-engine), a Java 21 limit order book matching engine with differential testing and JMH/HdrHistogram latency measurements.
 
