@@ -7,6 +7,7 @@ Inputs (all optional; missing reports are listed as "not found" instead of faili
   backend/target/failsafe-reports/TEST-*.xml     JUnit XML, backend integration tests (Testcontainers)
   backend/target/site/jacoco/jacoco.csv          JaCoCo coverage, unit + integration merged
   frontend/reports/junit.xml                     JUnit XML, Vitest
+  frontend/reports/e2e-junit.xml                 JUnit XML, Playwright browser tests (journeys + axe)
   frontend/reports/coverage/coverage-summary.json  Vitest (v8) coverage of the logic layer
   backend/target/pit-reports/mutations.xml       PIT mutation testing of the money and auction rules
 
@@ -123,6 +124,7 @@ def main():
         ("Backend unit (JUnit)", sorted(glob.glob(at("backend/target/surefire-reports/TEST-*.xml")))),
         ("Backend integration (Testcontainers + PostgreSQL)", sorted(glob.glob(at("backend/target/failsafe-reports/TEST-*.xml")))),
         ("Frontend unit (Vitest)", [p for p in [at("frontend/reports/junit.xml")] if os.path.exists(p)]),
+        ("Browser journeys + accessibility (Playwright, axe)", [p for p in [at("frontend/reports/e2e-junit.xml")] if os.path.exists(p)]),
     ]
     results = [(name, junit(paths) if paths else None) for name, paths in suites]
     found = [r for _, r in results if r]
