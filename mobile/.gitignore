@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+xcuserdata/
+
+# The root .gitignore excludes *.jar; the Gradle wrapper jar must be committed (CI validates its checksum).
+!gradle/wrapper/gradle-wrapper.jar

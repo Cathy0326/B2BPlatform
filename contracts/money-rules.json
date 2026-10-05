@@ -1,0 +1,514 @@
+{
+  "description": "Money rules every client must compute identically: TypeScript (frontend), Java (backend) and Kotlin (mobile) tests all read this file. Change a rule here first, then make all three test suites pass.",
+  "platformFee": {
+    "rule": "5% of the hammer price in cents, rounded half-up: floor((hammerCents * 500 + 5000) / 10000)",
+    "cases": [
+      {
+        "hammerCents": 0,
+        "feeCents": 0
+      },
+      {
+        "hammerCents": 1,
+        "feeCents": 0
+      },
+      {
+        "hammerCents": 9,
+        "feeCents": 0
+      },
+      {
+        "hammerCents": 10,
+        "feeCents": 1
+      },
+      {
+        "hammerCents": 19,
+        "feeCents": 1
+      },
+      {
+        "hammerCents": 29,
+        "feeCents": 1
+      },
+      {
+        "hammerCents": 30,
+        "feeCents": 2
+      },
+      {
+        "hammerCents": 99,
+        "feeCents": 5
+      },
+      {
+        "hammerCents": 100,
+        "feeCents": 5
+      },
+      {
+        "hammerCents": 12345,
+        "feeCents": 617
+      },
+      {
+        "hammerCents": 10500000,
+        "feeCents": 525000
+      },
+      {
+        "hammerCents": 4250000,
+        "feeCents": 212500
+      },
+      {
+        "hammerCents": 999999999,
+        "feeCents": 50000000
+      }
+    ]
+  },
+  "rentalQuote": {
+    "rule": "Cheapest cover of N consecutive days with day / week (7) / month (28) blocks; blocks may overhang; ties prefer the shorter block",
+    "rates": {
+      "excavator": {
+        "dailyCents": 110000,
+        "weeklyCents": 320000,
+        "monthlyCents": 800000
+      },
+      "weekBeatsFourDays": {
+        "dailyCents": 25000,
+        "weeklyCents": 90000,
+        "monthlyCents": 400000
+      },
+      "monthNeverPays": {
+        "dailyCents": 10000,
+        "weeklyCents": 60000,
+        "monthlyCents": 300000
+      }
+    },
+    "cases": [
+      {
+        "rates": "excavator",
+        "rentalDays": 1,
+        "totalCents": 110000,
+        "months": 0,
+        "weeks": 0,
+        "days": 1
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 2,
+        "totalCents": 220000,
+        "months": 0,
+        "weeks": 0,
+        "days": 2
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 3,
+        "totalCents": 320000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 4,
+        "totalCents": 320000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 6,
+        "totalCents": 320000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 7,
+        "totalCents": 320000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 8,
+        "totalCents": 430000,
+        "months": 0,
+        "weeks": 1,
+        "days": 1
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 13,
+        "totalCents": 640000,
+        "months": 0,
+        "weeks": 2,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 14,
+        "totalCents": 640000,
+        "months": 0,
+        "weeks": 2,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 27,
+        "totalCents": 800000,
+        "months": 1,
+        "weeks": 0,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 28,
+        "totalCents": 800000,
+        "months": 1,
+        "weeks": 0,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 29,
+        "totalCents": 910000,
+        "months": 1,
+        "weeks": 0,
+        "days": 1
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 31,
+        "totalCents": 1120000,
+        "months": 1,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 35,
+        "totalCents": 1120000,
+        "months": 1,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 56,
+        "totalCents": 1600000,
+        "months": 2,
+        "weeks": 0,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 60,
+        "totalCents": 1920000,
+        "months": 2,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 90,
+        "totalCents": 2720000,
+        "months": 3,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "excavator",
+        "rentalDays": 365,
+        "totalCents": 10510000,
+        "months": 13,
+        "weeks": 0,
+        "days": 1
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 1,
+        "totalCents": 25000,
+        "months": 0,
+        "weeks": 0,
+        "days": 1
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 2,
+        "totalCents": 50000,
+        "months": 0,
+        "weeks": 0,
+        "days": 2
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 3,
+        "totalCents": 75000,
+        "months": 0,
+        "weeks": 0,
+        "days": 3
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 4,
+        "totalCents": 90000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 6,
+        "totalCents": 90000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 7,
+        "totalCents": 90000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 8,
+        "totalCents": 115000,
+        "months": 0,
+        "weeks": 1,
+        "days": 1
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 13,
+        "totalCents": 180000,
+        "months": 0,
+        "weeks": 2,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 14,
+        "totalCents": 180000,
+        "months": 0,
+        "weeks": 2,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 27,
+        "totalCents": 360000,
+        "months": 0,
+        "weeks": 4,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 28,
+        "totalCents": 360000,
+        "months": 0,
+        "weeks": 4,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 29,
+        "totalCents": 385000,
+        "months": 0,
+        "weeks": 4,
+        "days": 1
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 31,
+        "totalCents": 435000,
+        "months": 0,
+        "weeks": 4,
+        "days": 3
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 35,
+        "totalCents": 450000,
+        "months": 0,
+        "weeks": 5,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 56,
+        "totalCents": 720000,
+        "months": 0,
+        "weeks": 8,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 60,
+        "totalCents": 810000,
+        "months": 0,
+        "weeks": 9,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 90,
+        "totalCents": 1170000,
+        "months": 0,
+        "weeks": 13,
+        "days": 0
+      },
+      {
+        "rates": "weekBeatsFourDays",
+        "rentalDays": 365,
+        "totalCents": 4705000,
+        "months": 0,
+        "weeks": 52,
+        "days": 1
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 1,
+        "totalCents": 10000,
+        "months": 0,
+        "weeks": 0,
+        "days": 1
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 2,
+        "totalCents": 20000,
+        "months": 0,
+        "weeks": 0,
+        "days": 2
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 3,
+        "totalCents": 30000,
+        "months": 0,
+        "weeks": 0,
+        "days": 3
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 4,
+        "totalCents": 40000,
+        "months": 0,
+        "weeks": 0,
+        "days": 4
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 6,
+        "totalCents": 60000,
+        "months": 0,
+        "weeks": 0,
+        "days": 6
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 7,
+        "totalCents": 60000,
+        "months": 0,
+        "weeks": 1,
+        "days": 0
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 8,
+        "totalCents": 70000,
+        "months": 0,
+        "weeks": 1,
+        "days": 1
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 13,
+        "totalCents": 120000,
+        "months": 0,
+        "weeks": 1,
+        "days": 6
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 14,
+        "totalCents": 120000,
+        "months": 0,
+        "weeks": 2,
+        "days": 0
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 27,
+        "totalCents": 240000,
+        "months": 0,
+        "weeks": 3,
+        "days": 6
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 28,
+        "totalCents": 240000,
+        "months": 0,
+        "weeks": 4,
+        "days": 0
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 29,
+        "totalCents": 250000,
+        "months": 0,
+        "weeks": 4,
+        "days": 1
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 31,
+        "totalCents": 270000,
+        "months": 0,
+        "weeks": 4,
+        "days": 3
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 35,
+        "totalCents": 300000,
+        "months": 0,
+        "weeks": 5,
+        "days": 0
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 56,
+        "totalCents": 480000,
+        "months": 0,
+        "weeks": 8,
+        "days": 0
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 60,
+        "totalCents": 520000,
+        "months": 0,
+        "weeks": 8,
+        "days": 4
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 90,
+        "totalCents": 780000,
+        "months": 0,
+        "weeks": 12,
+        "days": 6
+      },
+      {
+        "rates": "monthNeverPays",
+        "rentalDays": 365,
+        "totalCents": 3130000,
+        "months": 0,
+        "weeks": 52,
+        "days": 1
+      }
+    ]
+  }
+}
