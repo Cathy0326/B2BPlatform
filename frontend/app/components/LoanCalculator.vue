@@ -69,7 +69,7 @@ const breakEven = computed(() =>
       <button type="button" class="btn" :aria-expanded="showSchedule" @click="showSchedule = !showSchedule">
         {{ showSchedule ? 'Hide' : 'Show' }} monthly schedule ({{ result.schedule.length }} payments)
       </button>
-      <div v-if="showSchedule" class="table-wrap schedule">
+      <div v-if="showSchedule" class="table-wrap schedule" tabindex="0" role="region" aria-label="Monthly payment schedule">
         <table>
           <thead>
             <tr>

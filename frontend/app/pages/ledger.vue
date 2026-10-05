@@ -56,7 +56,7 @@ const short = (h: string) => `${h.slice(0, 10)}…`
 
       <section class="card stack">
         <h2>Accounts</h2>
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Accounts">
           <table>
             <thead>
               <tr><th>Account</th><th>Type</th><th class="r">Debits</th><th class="r">Credits</th><th class="r">Balance</th></tr>
@@ -82,7 +82,7 @@ const short = (h: string) => `${h.slice(0, 10)}…`
 
       <section class="card stack">
         <h2>Audit trail (latest)</h2>
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Audit trail">
           <table>
             <thead><tr><th>#</th><th>Event</th><th>Subject</th><th>Actor</th><th>prev_hash</th><th>hash</th></tr></thead>
             <tbody>

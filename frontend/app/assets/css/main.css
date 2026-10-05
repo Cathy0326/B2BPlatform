@@ -354,6 +354,11 @@ input[type='checkbox'] {
 .table-wrap {
   overflow-x: auto;
 }
+/* Scrollable tables are focusable so keyboard users can scroll them (WCAG 2.1.1); show where focus is. */
+.table-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 table {
   width: 100%;
   border-collapse: collapse;

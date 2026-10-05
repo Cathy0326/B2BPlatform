@@ -62,7 +62,7 @@ const total = (lines: { dr: number; cr: number }[], k: 'dr' | 'cr') => lines.red
         No account has an editable <code>balance</code> column. Balances are the sum of append-only journal lines,
         and every entry's debits equal its credits. Here is a $105,000 auction, settled:
       </p>
-      <div v-for="e in entries" :key="e.when" class="table-wrap entry">
+      <div v-for="e in entries" :key="e.when" class="table-wrap entry" tabindex="0" role="region" :aria-label="`Journal entry: ${e.when}`">
         <table>
           <caption>{{ e.when }}</caption>
           <thead>

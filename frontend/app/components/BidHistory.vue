@@ -7,7 +7,7 @@ const time = (ms: number) => new Date(ms).toLocaleTimeString('en-US', { hour: 'n
 </script>
 
 <template>
-  <div class="table-wrap">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Bid history">
     <table>
       <caption class="sr-only">Bid history, newest first</caption>
       <thead>

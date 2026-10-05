@@ -7,7 +7,7 @@ const sum = (e: JournalEntry, k: 'debitCents' | 'creditCents') => e.lines.reduce
 </script>
 
 <template>
-  <div class="table-wrap">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Journal entries">
     <table>
       <thead>
         <tr>
