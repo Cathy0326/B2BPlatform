@@ -113,7 +113,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: browser-reports
-          path: frontend/reports
+          path: frontend   # the artifact holds reports/… and test-results/…, relative to frontend/
         continue-on-error: true
       - uses: actions/download-artifact@v4
         with:
