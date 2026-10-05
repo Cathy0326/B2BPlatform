@@ -44,6 +44,17 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
+      # Trivy needs every transitive dependency's POM to see e.g. Tomcat inside Spring Boot. Fetching them from
+      # Maven Central during the scan gets shared GitHub runners rate-limited (HTTP 429), so fill the local Maven
+      # repository first (restored from the same cache the backend CI job uses) and scan with --offline-scan.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Resolve backend dependencies into the local Maven repository
+        working-directory: backend
+        run: ./mvnw -B -q dependency:resolve
       - name: Install Trivy (official release, checksum verified)
         run: |
           v=0.75.0
@@ -54,14 +65,14 @@ jobs:
           tar -xzf "trivy_${v}_Linux-64bit.tar.gz" trivy
           ./trivy --version
       - name: Report for the Security tab
-        run: ./trivy fs --config trivy.yaml --scanners vuln,secret,misconfig --format sarif --output trivy-repo.sarif --exit-code 0 .
+        run: ./trivy fs --config trivy.yaml --scanners vuln,secret,misconfig --offline-scan --format sarif --output trivy-repo.sarif --exit-code 0 .
       - uses: github/codeql-action/upload-sarif@v4
         if: ${{ !cancelled() }}
         with:
           sarif_file: trivy-repo.sarif
           category: trivy-repo
       - name: Gate (fixable HIGH/CRITICAL vulnerabilities, HIGH/CRITICAL misconfigurations, secrets)
-        run: ./trivy fs --config trivy.yaml --scanners vuln,secret,misconfig --skip-db-update --skip-check-update --format table --exit-code 1 .
+        run: ./trivy fs --config trivy.yaml --scanners vuln,secret,misconfig --offline-scan --skip-db-update --skip-check-update --format table --exit-code 1 .
 
   trivy-images:
     name: Trivy (container images)
