@@ -71,16 +71,7 @@ The first push or PR runs `.github/workflows/ci.yml` automatically: open the **A
 
 ### 1.4 Kubernetes + OpenTofu (optional, costs money)
 
-```powershell
-cd infra
-$env:TF_VAR_linode_token = "..."; $env:TF_VAR_cloudflare_api_token = "..."
-copy terraform.tfvars.example terraform.tfvars   # fill in zone id + domain
-tofu init; tofu apply                            # LKE cluster + managed PostgreSQL (~$50-70/month; destroy after the demo!)
-tofu output -raw kubeconfig | base64 -d > $HOME\.kube\quipmarket.yaml
-# install ingress-nginx + cert-manager (Helm), create the backend-secrets Secret (k8s/base/secret.example.yaml.txt), then:
-kubectl apply -k ..\k8s\base
-tofu destroy                                     # when done
-```
+Superseded by [Environments & Deployment](../DEPLOYMENT.md): the infrastructure is now created per environment (dev, staging, production) with one OpenTofu workspace and encrypted remote state each, and applications are deployed by the Deploy workflow. A managed Kubernetes cluster plus PostgreSQL costs about $50–70 a month per environment, so destroy what you are not using (`tofu destroy -var-file=environments/<env>.tfvars`).
 > The Linode Postgres `allow_list` must include your LKE node IPs, otherwise the backend can't connect.
 
 ---

@@ -20,7 +20,8 @@
 | Payments | `PaymentGateway` strategy: simulated (default) or Stripe test mode (PaymentIntents, manual capture, signed webhooks) |
 | Money & audit | Double-entry ledger (balanced and append-only, enforced by PostgreSQL), SHA-256 hash-chained audit log |
 | Security | Auth0 (OAuth2/JWT, issuer + audience validation, roles), token-bucket rate limiting, GraphQL depth/complexity limits; CodeQL, Trivy, gitleaks and SpotBugs + Find Security Bugs in CI |
-| Delivery | Docker (multi-stage, non-root), GitHub Actions (every push deploys to a throwaway kind cluster and smoke-tests it), Kubernetes manifests, OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS) |
+| Delivery | Docker (multi-stage, non-root), GitHub Actions (every push deploys to a throwaway kind cluster and smoke-tests it), Kubernetes manifests (kustomize overlays for dev, staging, production), OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS; a workspace and encrypted remote state per environment) |
+| Environments | dev, staging and production; every merge to `main` deploys to staging, a `v*` tag promotes the same image digests to production after approval |
 
 ## Highlights
 
@@ -92,6 +93,7 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
 | [Quality](docs/QUALITY.md) | Test pyramid, pass rate and coverage, security scanning and static analysis, enterprise testing practices |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
+| [Deployment](docs/DEPLOYMENT.md) | Environments, the build-once / promote-by-digest pipeline, release and rollback, one-time GitHub setup |
 | [Contributing](CONTRIBUTING.md) | ClickUp ↔ GitHub workflow: branch and commit naming, pull request template, definition of done |
 
 **Related:** [order-book-engine](https://github.com/Cathy0326/order-book-engine), a Java 21 limit order book matching engine with differential testing and JMH/HdrHistogram latency measurements.

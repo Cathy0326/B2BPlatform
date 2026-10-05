@@ -105,6 +105,12 @@ jobs:
         run: |
           docker run --rm -v "$PWD/k8s:/k8s" ghcr.io/yannh/kubeconform:latest \
             -strict -summary -ignore-missing-schemas -skip Kustomization /k8s
+      - name: Render and validate every environment overlay
+        run: |
+          for env in dev staging prod ci; do
+            echo "== $env"
+            kubectl kustomize "k8s/overlays/$env" | docker run -i --rm ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary
+          done
       - uses: opentofu/setup-opentofu@v1
       - name: tofu fmt + validate
         working-directory: infra

@@ -9,7 +9,7 @@ ClickUp task (CU-86abc123)            GitHub
   To do        ──► branch  feature/CU-86abc123-rental-quote-banner
   In progress  ──► commits "CU-86abc123 Show the cheapest rental mix on the quote"
   In review    ──► pull request (template asks for the task ID) ──► CI green ──► review
-  Done         ◄── merged to main
+  Done         ◄── merged to main ──► deployed to staging automatically (docs/DEPLOYMENT.md)
 ```
 
 | Step | Rule |

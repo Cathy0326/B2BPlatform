@@ -1,3 +1,12 @@
+variable "environment" {
+  description = "Which environment this state describes. Must match the selected workspace."
+  type        = string
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be dev, staging or prod."
+  }
+}
+
 variable "linode_token" {
   description = "Linode API token (Cloud Manager > API Tokens). Pass via TF_VAR_linode_token, never commit."
   type        = string
@@ -64,4 +73,10 @@ variable "ingress_ip" {
   description = "Public IP of the ingress-nginx LoadBalancer (known after installing ingress-nginx). Empty = no DNS records yet."
   type        = string
   default     = ""
+}
+
+variable "state_passphrase" {
+  description = "Passphrase for OpenTofu state encryption (16+ characters). Pass via TF_VAR_state_passphrase, never commit."
+  type        = string
+  sensitive   = true
 }

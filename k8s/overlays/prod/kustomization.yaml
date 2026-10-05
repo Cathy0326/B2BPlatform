@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Production: the base manifests unchanged. Kept as its own overlay so production-only settings have an
+# obvious home and the deploy workflow treats every environment the same way. The deploy job pins both
+# images to the digest that staging ran (kustomize edit set image ...@sha256:...), never to a moving tag.
+namespace: quipmarket
+resources:
+  - ../../base

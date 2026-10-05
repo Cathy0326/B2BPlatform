@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Development: the production manifests at the smallest size, with seeded demo data.
+# Auth0 dev tenant and Stripe test mode, so features can be tried end to end without real money.
+# Deployed on demand: Actions → Deploy → Run workflow → dev.
+namespace: quipmarket-dev
+resources:
+  - ../../base
+patches:
+  - target: { kind: Deployment }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+  # One replica cannot satisfy "minAvailable: 1" during a node drain, so dev has no disruption budget.
+  - target: { kind: PodDisruptionBudget, name: backend }
+    patch: |-
+      $patch: delete
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: backend
+  - target: { kind: ConfigMap, name: backend-config }
+    patch: |-
+      - { op: replace, path: /data/SPRING_PROFILES_ACTIVE, value: demo }
+      - { op: replace, path: /data/CORS_ALLOWED_ORIGINS, value: "https://dev.quipmarket.example.com" }
+  - target: { kind: ConfigMap, name: frontend-config }
+    patch: |-
+      - { op: replace, path: /data/NUXT_PUBLIC_GRAPHQL_URL, value: "https://api.dev.quipmarket.example.com/graphql" }
+      - { op: replace, path: /data/NUXT_PUBLIC_AUTH0_DOMAIN, value: "your-tenant-dev.us.auth0.com" }
+      - { op: replace, path: /data/NUXT_PUBLIC_AUTH0_AUDIENCE, value: "https://api.dev.quipmarket.example.com" }
+  - target: { kind: Ingress, name: quipmarket }
+    patch: |-
+      - { op: replace, path: /spec/tls/0/hosts, value: [dev.quipmarket.example.com, api.dev.quipmarket.example.com] }
+      - { op: replace, path: /spec/rules/0/host, value: dev.quipmarket.example.com }
+      - { op: replace, path: /spec/rules/1/host, value: api.dev.quipmarket.example.com }

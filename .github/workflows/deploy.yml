@@ -1,0 +1,173 @@
+name: Deploy
+
+# One pipeline for every environment. Images are built once, by CI on main (tag sha-<commit>), and are then
+# deployed by digest, so staging and production run byte-for-byte the same image:
+#
+#   merge to main ─► CI green ─► staging (automatic)
+#   tag v1.2.3    ─► check: on main, and that commit is live on staging ─► production (after approval)
+#   Run workflow  ─► dev, any commit CI has built on main
+#
+# Each environment is a GitHub Environment with its own secrets (KUBECONFIG_B64) and protection rules
+# (production: a required reviewer, tags v* only). Without a kubeconfig the job still renders and validates
+# the exact manifests it would apply and attaches them to the run; it never pretends to have deployed.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy to dev (empty = latest main). It must have been built by CI on main.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve commit and image digests
+    # Deploy to staging only when CI passed on a push to main (not on a pull request run).
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      deployments: read
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+      overlay: ${{ steps.target.outputs.overlay }}
+      sha: ${{ steps.target.outputs.sha }}
+      skip: ${{ steps.target.outputs.skip }}
+      backend: ${{ steps.digests.outputs.backend }}
+      frontend: ${{ steps.digests.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: target
+        name: Choose environment and commit
+        env:
+          EVENT: ${{ github.event_name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          case "$EVENT" in
+            workflow_run) env=staging; sha=$RUN_SHA ;;
+            push)         env=production; sha=$GITHUB_SHA ;;
+            *)            env=dev; sha=$(git rev-parse "${INPUT_SHA:-origin/main}^{commit}") ;;
+          esac
+          # Staging follows main. If newer commits landed while CI ran, their own CI run deploys them; skipping
+          # here keeps staging from going backwards and keeps its deployment history accurate per commit.
+          if [ "$env" = staging ] && [ "$sha" != "$(git rev-parse origin/main)" ]; then
+            echo "::notice::main has moved past ${sha::7}; the newer commit's CI run will deploy it."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+          git merge-base --is-ancestor "$sha" origin/main \
+            || { echo "::error::$sha is not on main. Only commits merged to main are deployed."; exit 1; }
+          overlay=$([ "$env" = production ] && echo prod || echo "$env")
+          echo "environment=$env" >> "$GITHUB_OUTPUT"
+          echo "overlay=$overlay" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Production only promotes what is running on staging
+        if: steps.target.outputs.environment == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=staging&sha=$SHA" --jq '.[0].id // empty')
+          state=$([ -n "$id" ] && gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --jq '.[0].state // empty')
+          [ "$state" = success ] \
+            || { echo "::error::Commit $SHA has no successful staging deployment (found: ${state:-none}). Deploy it to staging first."; exit 1; }
+          echo "Staging deployment $id of $SHA succeeded; promoting the same images."
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: digests
+        name: Look up the digests CI pushed for this commit
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          for app in backend frontend; do
+            ref="ghcr.io/$owner/quipmarket-$app:sha-${SHA::7}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest.Digest}}' | tr -d '"') \
+              || { echo "::error::$ref not found. CI on main builds it; wait for CI to finish, then re-run."; exit 1; }
+            echo "$app=$digest" >> "$GITHUB_OUTPUT"
+            echo "$app: $ref → $digest"
+          done
+
+  deploy:
+    name: Deploy to ${{ needs.resolve.outputs.environment }}
+    needs: resolve
+    if: needs.resolve.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.resolve.outputs.environment }}
+      url: ${{ vars.APP_URL }}
+    # Never two rollouts to the same environment at once, and never cancel one halfway.
+    concurrency:
+      group: deploy-${{ needs.resolve.outputs.environment }}
+      cancel-in-progress: false
+    env:
+      OVERLAY: ${{ needs.resolve.outputs.overlay }}
+      SHA: ${{ needs.resolve.outputs.sha }}
+      BACKEND_DIGEST: ${{ needs.resolve.outputs.backend }}
+      FRONTEND_DIGEST: ${{ needs.resolve.outputs.frontend }}
+      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      - name: Render the manifests with images pinned by digest
+        run: |
+          mkdir -p .deploy
+          cat > .deploy/kustomization.yaml <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          resources:
+            - ../k8s/overlays/$OVERLAY
+          images:
+            - name: ghcr.io/cathy0326/quipmarket-backend
+              digest: $BACKEND_DIGEST
+            - name: ghcr.io/cathy0326/quipmarket-frontend
+              digest: $FRONTEND_DIGEST
+          EOF
+          kubectl kustomize .deploy > rendered.yaml
+          grep -n 'image:' rendered.yaml
+      - name: Validate the rendered manifests
+        run: docker run -i --rm ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary < rendered.yaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifests-${{ needs.resolve.outputs.environment }}-${{ needs.resolve.outputs.sha }}
+          path: rendered.yaml
+      - name: Apply and wait for the rollout
+        if: env.KUBECONFIG_B64 != ''
+        run: |
+          echo "$KUBECONFIG_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig"
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          ns=$(grep -m1 -A3 '^kind: Namespace' rendered.yaml | sed -n 's/^  name: //p')
+          kubectl -n "$ns" get secret backend-secrets >/dev/null \
+            || { echo "::error::Secret backend-secrets is missing in namespace $ns. Create it before the first deploy."; exit 1; }
+          kubectl apply -f rendered.yaml
+          for d in backend frontend; do kubectl -n "$ns" rollout status "deployment/$d" --timeout=300s; done
+      - name: Summary
+        if: always()
+        env:
+          ENV_NAME: ${{ needs.resolve.outputs.environment }}
+        run: |
+          applied=$([ -n "$KUBECONFIG_B64" ] && echo "applied and rolled out" || echo "rendered and validated only: no KUBECONFIG_B64 secret in this environment")
+          {
+            echo "### Deploy to $ENV_NAME"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${SHA::7}\` |"
+            echo "| Backend image | \`$BACKEND_DIGEST\` |"
+            echo "| Frontend image | \`$FRONTEND_DIGEST\` |"
+            echo "| Result | $applied |"
+          } >> "$GITHUB_STEP_SUMMARY"

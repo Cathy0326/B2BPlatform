@@ -1,9 +1,9 @@
 # Kubernetes cluster (Linode Kubernetes Engine) with an autoscaling node pool.
 resource "linode_lke_cluster" "main" {
-  label       = "quipmarket"
+  label       = "quipmarket-${var.environment}"
   k8s_version = var.k8s_version
   region      = var.region
-  tags        = ["quipmarket"]
+  tags        = ["quipmarket", var.environment]
 
   pool {
     type  = var.node_type
@@ -14,11 +14,20 @@ resource "linode_lke_cluster" "main" {
       max = var.node_count_max
     }
   }
+
+  lifecycle {
+    # Each environment has its own state (one workspace per environment). Applying prod.tfvars inside the
+    # staging workspace would rename and resize the staging cluster, so refuse before anything changes.
+    precondition {
+      condition     = terraform.workspace == var.environment
+      error_message = "Workspace and environment differ. Run: tofu workspace select ${var.environment}"
+    }
+  }
 }
 
 # Managed PostgreSQL 16: backups, patching and TLS handled by Linode.
 resource "linode_database_postgresql_v2" "main" {
-  label        = "quipmarket-db"
+  label        = "quipmarket-${var.environment}-db"
   engine_id    = "postgresql/16"
   region       = var.region
   type         = var.db_type

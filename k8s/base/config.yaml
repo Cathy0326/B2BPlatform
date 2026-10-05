@@ -20,7 +20,7 @@ metadata:
   namespace: quipmarket
 data:
   NUXT_PUBLIC_GRAPHQL_URL: https://api.quipmarket.example.com/graphql
-  NUXT_GRAPHQL_URL_SERVER: http://backend.quipmarket.svc.cluster.local:8080/graphql
+  NUXT_GRAPHQL_URL_SERVER: http://backend:8080/graphql   # Service name in the same namespace: works in every environment
   # Public by design (they are visible in the browser anyway): not secrets.
   NUXT_PUBLIC_AUTH0_DOMAIN: your-tenant.us.auth0.com
   NUXT_PUBLIC_AUTH0_CLIENT_ID: replace-with-spa-client-id
