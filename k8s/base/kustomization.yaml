@@ -1,12 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# kubectl apply -k k8s/base     (create the backend-secrets Secret first, see secret.example.yaml.txt)
+# Shared by every environment; deploy through an overlay (k8s/overlays/<env>), see docs/DEPLOYMENT.md
 resources:
   - namespace.yaml
   - config.yaml
   - backend.yaml
   - frontend.yaml
   - ingress.yaml
+  - network-policy.yaml
 images:
   - name: ghcr.io/cathy0326/quipmarket-backend
     newTag: latest

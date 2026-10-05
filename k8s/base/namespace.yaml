@@ -2,3 +2,10 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: quipmarket
+  labels:
+    # Pod Security Admission: the API server itself rejects any pod in this namespace that runs as root,
+    # can escalate privileges, keeps Linux capabilities or runs without a seccomp profile.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

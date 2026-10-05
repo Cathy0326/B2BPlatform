@@ -20,8 +20,8 @@
 | Data | PostgreSQL 16, Flyway, plain SQL via `JdbcClient`, LISTEN/NOTIFY for cross-replica events |
 | Payments | `PaymentGateway` strategy: simulated (default) or Stripe test mode (PaymentIntents, manual capture, signed webhooks) |
 | Money & audit | Double-entry ledger (balanced and append-only, enforced by PostgreSQL), SHA-256 hash-chained audit log |
-| Security | Auth0 (OAuth2/JWT, issuer + audience validation, roles), token-bucket rate limiting, GraphQL depth/complexity limits; CodeQL, Trivy, gitleaks and SpotBugs + Find Security Bugs in CI |
-| Delivery | Docker (multi-stage, non-root), GitHub Actions (every push deploys to a throwaway kind cluster and smoke-tests it), Kubernetes manifests (kustomize overlays for dev, staging, production), OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS; a workspace and encrypted remote state per environment) |
+| Security | Auth0 (OAuth2/JWT, issuer + audience validation, roles), token-bucket rate limiting, GraphQL depth/complexity limits; secrets committed encrypted with SOPS + age (one key per environment); default-deny NetworkPolicies, Pod Security `restricted`, Linode Cloud Firewall; CodeQL, Trivy, gitleaks and SpotBugs + Find Security Bugs in CI |
+| Delivery | Docker (multi-stage, non-root), GitHub Actions (every push deploys to a throwaway kind cluster and smoke-tests it), Kubernetes on containerd (kustomize overlays for dev, staging, production), OpenTofu (Linode LKE, managed PostgreSQL, Cloudflare DNS; a workspace and encrypted remote state per environment) |
 | Environments | dev, staging and production; every merge to `main` deploys to staging, a `v*` tag promotes the same image digests to production after approval |
 
 ## Highlights
@@ -76,7 +76,7 @@ Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover
 **391 automated tests, 100% passing on `main`** · backend coverage **94% lines / 85% branches** (unit + integration) · frontend logic coverage **99% lines / 89% branches** · CI fails if coverage drops below its floor · CodeQL, Trivy, gitleaks, SpotBugs and ESLint on every push · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
 
 ```
-  kind deploy + smoke test      1   real Kubernetes: probes, cluster DNS, SSR → API → PostgreSQL
+  kind deploy + smoke test      1   real Kubernetes: probes, cluster DNS, SSR → API → PostgreSQL, Pod Security and NetworkPolicy enforced
   browser click-through             Playwright on the Cloudflare build
   integration (Testcontainers)  69  real PostgreSQL 16, 50-thread race tests, GraphQL API, demo bots
   unit (JUnit + Vitest)        322  ledger rules, audit hash chain, pricing, auction engine, payments, API clients, shared money-rule contract
@@ -96,7 +96,7 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | [Mobile](mobile/README.md) | Kotlin Multiplatform shared module, Android app, iOS framework, the money-rule contract shared by all clients |
 | [Quality](docs/QUALITY.md) | Test pyramid, pass rate and coverage, security scanning and static analysis, enterprise testing practices |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
-| [Deployment](docs/DEPLOYMENT.md) | Environments, the build-once / promote-by-digest pipeline, release and rollback, one-time GitHub setup |
+| [Deployment](docs/DEPLOYMENT.md) | Environments, the build-once / promote-by-digest pipeline, release and rollback, secrets (SOPS), hardening, containerd |
 | [Contributing](CONTRIBUTING.md) | ClickUp ↔ GitHub workflow: branch and commit naming, pull request template, definition of done |
 
 **Related:** [order-book-engine](https://github.com/Cathy0326/order-book-engine), a Java 21 limit order book matching engine with differential testing and JMH/HdrHistogram latency measurements.

@@ -54,7 +54,9 @@ resolve ─► environment + commit (must be on main)
 deploy  ─► (GitHub Environment: secrets, required reviewer for production)
         ─► kustomize: overlay + images pinned by digest  →  rendered.yaml
         ─► kubeconform validates it · uploaded as a run artifact
-        ─► if the environment has KUBECONFIG_B64: check backend-secrets exists → kubectl apply → rollout status
+        ─► if the environment has KUBECONFIG_B64:
+             namespace (Pod Security labels) → sops -d backend-secrets.enc.yaml | kubectl apply (in memory only)
+             → kubectl apply → rollout status
         ─► summary: commit, both digests, result
 ```
 
@@ -68,6 +70,7 @@ Without cluster credentials the job stops after validation and says so in its su
    - **Deployment branches and tags → Selected branches and tags → Add rule**: tag pattern `v*`.
 3. In each environment, once the cluster exists:
    - **Secret** `KUBECONFIG_B64`: the kubeconfig, base64-encoded. OpenTofu already outputs it that way (`tofu output -raw kubeconfig`).
+   - **Secret** `SOPS_AGE_KEY`: that environment's private age key (`AGE-SECRET-KEY-1…`), which decrypts only its own Secret file (section 8).
    - **Variable** `APP_URL`, for example `https://staging.quipmarket.example.com`. It appears as a link on the Deployments page.
 
 Until step 3 is done, the pipeline runs fully and validates everything but does not apply.
@@ -91,7 +94,8 @@ Windows PowerShell: use `$env:TF_VAR_linode_token = "..."` instead of `export`.
 
 Then, once per cluster:
 - Install ingress-nginx and cert-manager (Helm).
-- Create the `backend-secrets` Secret in the environment's namespace (see `k8s/base/secret.example.yaml.txt`).
+- Put the real values into the environment's encrypted Secret: `sops k8s/overlays/<env>/backend-secrets.enc.yaml` (section 8), using the database outputs (`tofu output -raw db_password` and so on).
+- Add the cluster's node IPs to `db_allow_list` and apply again.
 - Set `ingress_ip` in the tfvars file and apply again, so the Cloudflare DNS records are created.
 
 Infrastructure changes are applied by a person, one environment at a time (dev → staging → prod), after reading the plan. Application deploys are fully automated.
@@ -112,3 +116,64 @@ Then go to **Actions → Deploy**, open the run and click **Review deployments �
 kubectl kustomize k8s/overlays/staging | kubeconform -strict -summary   # what CI runs for every overlay
 kubectl diff -k k8s/overlays/staging                                     # against a real cluster: what would change
 ```
+
+## 8. Secrets: SOPS + age
+
+Secrets are committed to Git, **encrypted**. [SOPS](https://github.com/getsops/sops) encrypts only the values, so the file still shows which keys exist and a pull request diff shows which value changed, but not the value itself.
+
+```
+k8s/overlays/staging/backend-secrets.enc.yaml
+  stringData:
+    DATABASE_PASSWORD: ENC[AES256_GCM,data:pY35cUiW…]   ← readable only with the staging or the admin key
+```
+
+| Key | Who holds the private half | Can decrypt |
+|---|---|---|
+| dev | GitHub Environment `dev` (`SOPS_AGE_KEY`) | dev only |
+| staging | GitHub Environment `staging` | staging only |
+| prod | GitHub Environment `production`, released only after the approval | production only |
+| admin | The owner's password manager, offline | everything, to edit and for break-glass access |
+
+Why this design:
+- **No extra server:** SOPS needs no component in the cluster (unlike Sealed Secrets) and no paid secret manager (Linode has none).
+- **Blast radius per environment:** a leaked staging key exposes staging only, and the staging deploy job never receives the production key.
+- **Never on disk:** the deploy job pipes `sops -d` straight into `kubectl apply`. The rendered manifests attached to each run contain no Secret.
+- **Enforced by CI:** the infrastructure job fails if a `kind: Secret` manifest is committed outside a `*.enc.yaml` file, or if any value in an encrypted file is in plain text. gitleaks and Trivy still scan for keys anywhere else.
+
+Everyday commands (with `SOPS_AGE_KEY_FILE` pointing to your key file):
+
+```bash
+sops k8s/overlays/staging/backend-secrets.enc.yaml          # opens decrypted in your editor; re-encrypts on save
+sops -d k8s/overlays/staging/backend-secrets.enc.yaml       # print decrypted (never redirect into the repository)
+sops updatekeys k8s/overlays/staging/backend-secrets.enc.yaml   # after changing .sops.yaml (rotation, new admin)
+```
+
+OpenTofu has its own secrets (API tokens, the state passphrase). They are passed as `TF_VAR_*` environment variables and never written to a file in the repository. The state file is encrypted (section 2).
+
+## 9. Hardening
+
+| Layer | Control | Where |
+|---|---|---|
+| Pods | Non-root user, read-only root filesystem, no privilege escalation, all Linux capabilities dropped, `RuntimeDefault` seccomp profile, resource requests and limits | `k8s/base/backend.yaml`, `frontend.yaml` |
+| Namespace | Pod Security Admission `restricted` (`enforce`, `warn`, `audit`): the API server rejects any pod that breaks the rules above | `k8s/base/namespace.yaml` |
+| Pod network | Default-deny ingress. Only ingress-nginx may reach the frontend; only ingress-nginx and the frontend may reach the backend | `k8s/base/network-policy.yaml` |
+| Nodes | Linode Cloud Firewall: inbound `DROP` except the control-plane, Calico and NodeBalancer ranges LKE needs | `infra/main.tf` (`linode_firewall.nodes`) |
+| Database | Managed PostgreSQL reachable only from listed node IPs (`0.0.0.0/0` is rejected by validation), TLS required in the JDBC URL, weekly patch window | `infra/main.tf`, `variables.tf` |
+| Secrets | Encrypted in Git per environment, decrypted only in the deploy job (section 8) | `.sops.yaml` |
+| Infrastructure state | Encrypted, remote, one file per environment | `infra/versions.tf` |
+| Supply chain | Images deployed by digest; scanners and SOPS installed as checksum-verified release binaries | `.github/workflows/` |
+| Continuous checks | CodeQL, Trivy (dependencies, secrets, Kubernetes/OpenTofu misconfiguration, images), gitleaks, SpotBugs | [QUALITY.md §7](QUALITY.md#7-security-scanning-and-static-analysis) |
+
+The CI kind cluster enforces the same Pod Security labels and NetworkPolicies, so the smoke test also proves that the hardened manifests work: the backend still reaches PostgreSQL and the frontend still renders data from the backend.
+
+## 10. Container runtime: containerd
+
+Kubernetes runs containers through containerd on Linode Kubernetes Engine nodes and in the CI kind cluster. Docker is only used to *build* images; Kubernetes never talks to Docker. Images are standard OCI images, so the same image runs under both.
+
+| Task | Command |
+|---|---|
+| Load a locally built image into kind (it goes into the node's containerd image store) | `kind load docker-image quipmarket-backend:ci --name quipmarket-ci` |
+| List images in containerd on a node | `crictl images` (on the node: `docker exec -it quipmarket-ci-control-plane crictl images` in kind) |
+| List running containers / read logs below Kubernetes | `crictl ps`, `crictl logs <container-id>` |
+| Debug a pod without SSH to the node | `kubectl debug node/<node> -it --image=busybox` then `chroot /host crictl ps` |
+| Check the runtime of every node | `kubectl get nodes -o wide` (column CONTAINER-RUNTIME, e.g. `containerd://1.7.x`) |
