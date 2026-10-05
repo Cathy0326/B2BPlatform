@@ -1,6 +1,6 @@
 # QuipMarket
 
-[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml) [![Security](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml) [![Mobile](https://github.com/Cathy0326/B2BPlatform/actions/workflows/mobile.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/mobile.yml) [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/tests.json)](docs/QUALITY.md) [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-backend.json)](docs/QUALITY.md) [![Frontend logic coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-frontend.json)](docs/QUALITY.md)
+[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml) [![Security](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml) [![Mobile](https://github.com/Cathy0326/B2BPlatform/actions/workflows/mobile.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/mobile.yml) [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/tests.json)](docs/QUALITY.md) [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-backend.json)](docs/QUALITY.md) [![Frontend logic coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-frontend.json)](docs/QUALITY.md) [![Mutation score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/mutation.json)](docs/QUALITY.md)
 
 **Heavy-equipment auctions, rentals & escrow settlement**, a B2B marketplace where bids can't race, bookings can't double-book, and every dollar is traceable through a double-entry ledger.
 
@@ -65,24 +65,27 @@ cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
 
 **Tests:**
 ```bash
-cd frontend && npm test && npm run typecheck     # 176 unit tests (npm run test:ci adds coverage + the coverage gate)
-cd backend  && ./mvnw verify                     # 146 unit + 69 Testcontainers integration tests + JaCoCo coverage gate
+cd frontend && npm test && npm run typecheck     # 188 unit and property tests (npm run test:ci adds coverage + the coverage gate)
+cd frontend && npm run build && npm run test:e2e  # 40 browser tests: user journeys + axe accessibility, desktop and phone
+cd backend  && ./mvnw verify                     # 157 unit and property + 70 Testcontainers integration tests + JaCoCo coverage gate
+cd backend  && ./mvnw org.pitest:pitest-maven:mutationCoverage   # mutation testing of the money rules (gate 95%)
 ```
 
 Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover docs.
 
 ## Quality
 
-**391 automated tests, 100% passing on `main`** · backend coverage **94% lines / 85% branches** (unit + integration) · frontend logic coverage **99% lines / 89% branches** · CI fails if coverage drops below its floor · CodeQL, Trivy, gitleaks, SpotBugs and ESLint on every push · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
+**455 automated tests, 100% passing on `main`** · backend coverage **94% lines / 85% branches** (unit + integration) · frontend logic coverage **99% lines / 89% branches** · **mutation score 99%** on the money and auction rules · property-based tests (jqwik, fast-check) · browser journeys and WCAG accessibility checks (Playwright, axe) · CI fails if coverage or mutation score drops below its floor · CodeQL, Trivy, gitleaks, SpotBugs and ESLint on every push · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
 
 ```
-  kind deploy + smoke test      1   real Kubernetes: probes, cluster DNS, SSR → API → PostgreSQL, Pod Security and NetworkPolicy enforced
-  browser click-through             Playwright on the Cloudflare build
-  integration (Testcontainers)  69  real PostgreSQL 16, 50-thread race tests, GraphQL API, demo bots
-  unit (JUnit + Vitest)        322  ledger rules, audit hash chain, pricing, auction engine, payments, API clients, shared money-rule contract
+  kind deploy + smoke test       1   real Kubernetes: probes, DNS, SSR → API → PostgreSQL, Pod Security, NetworkPolicy
+  browser (Playwright + axe)    40   buyer journeys, WCAG 2.1 AA on every page, light/dark, desktop/phone
+  integration (Testcontainers)  70   real PostgreSQL 16, 50-thread race tests, GraphQL API, randomized ledger model
+  unit + property-based        345   money rules, auction engine, ledger, API clients (JUnit, jqwik, Vitest, fast-check)
+  mutation testing (PIT)       99%   of 131 planted bugs in the money and auction rules are caught
 ```
 
-Each CI run's *Summary* tab shows the full report: pass rate per suite, failing tests by name, and coverage per module. See [docs/QUALITY.md](docs/QUALITY.md) for the approach, and for how it maps to testing practices common at financial and trading firms.
+Each CI run's *Summary* tab shows the full report: pass rate per suite, failing tests by name, coverage per module, and the mutation score with any surviving mutants. See [docs/QUALITY.md](docs/QUALITY.md) for the approach, and for how it maps to testing practices common at financial and trading firms.
 
 ## Documentation
 
@@ -93,6 +96,7 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | [Phase 3](docs/handover/phase-3.md) | Payments (Stripe), escrow saga, double-entry ledger, idempotency, webhooks, audit chain |
 | [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
 | [Phase 5](docs/handover/phase-5.md) | Environments and deploy pipeline, SOPS secrets, hardening, Kotlin Multiplatform, ClickUp workflow |
+| [Phase 6](docs/handover/phase-6.md) | Property-based tests (jqwik, fast-check), mutation testing (PIT), Playwright browser tests and axe accessibility checks |
 | [Mobile](mobile/README.md) | Kotlin Multiplatform shared module, Android app, iOS framework, the money-rule contract shared by all clients |
 | [Quality](docs/QUALITY.md) | Test pyramid, pass rate and coverage, security scanning and static analysis, enterprise testing practices |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
@@ -110,3 +114,4 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | 3 | Ledger, escrow, idempotency, Stripe test mode, webhooks, audit hash chain | ✅ |
 | 4 | Auth0, rate limiting, multi-replica events, Docker, CI, Kubernetes, OpenTofu | ✅ |
 | 5 | dev/staging/prod with promote-by-digest deploys, SOPS secrets, Pod Security + NetworkPolicies, Kotlin Multiplatform mobile | ✅ |
+| 6 | Property-based tests, mutation testing gated at 95%, browser journeys and WCAG accessibility checks in CI | ✅ |

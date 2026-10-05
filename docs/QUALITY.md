@@ -24,7 +24,10 @@ python3 scripts/quality-report.py      # prints the same report CI shows
 
 | Metric | Value |
 |---|---|
-| Automated tests | **391**: 146 backend unit + 69 backend integration + 176 frontend unit (each unit suite includes the 67 cases of the shared money-rule contract, which the Kotlin mobile module also runs on JVM, Android and iOS) |
+| Automated tests | **455**: 157 backend unit and property-based + 70 backend integration + 188 frontend unit and property-based + 40 browser (each unit suite includes the 70 cases of the shared money-rule contract, which the Kotlin mobile module also runs on JVM, Android and iOS) |
+| Mutation score (PIT) | **99.2%** (130 of 131 planted bugs caught) in the fee, ledger, rental pricing, loan and auction rules; CI fails below 95% |
+| Property-based tests | 11 jqwik properties (1,000 random cases each, 500 for whole bidding wars) and 9 fast-check properties |
+| Accessibility | 0 WCAG 2.1 A/AA violations (axe) on 8 pages × light/dark × desktop/phone |
 | Pass rate on `main` | **100%** (CI blocks merging anything red) |
 | Backend line coverage (JaCoCo, unit + integration) | **93.7%** (1,331 / 1,420 lines) |
 | Backend branch coverage | **85.3%** |
@@ -33,9 +36,9 @@ python3 scripts/quality-report.py      # prints the same report CI shows
 | Concurrency tests | 50 threads × 10 rounds (bookings), 40 threads (bids) |
 | Deployment test | Every push deploys the stack to a throwaway Kubernetes (kind) cluster and smoke-tests it |
 
-The frontend number covers the logic layer only, on purpose: pages and components are checked by a scripted browser click-through (Playwright) against the real Cloudflare build, and that is planned to move into CI (Q2 below).
+The frontend number covers the logic layer only, on purpose: pages and components are covered by the Playwright browser tests (section 8).
 
-**Reading the numbers honestly:** coverage tells you which code ran during tests, not whether the tests check the right things. That is why the most important tests here were also checked the other way round: remove the protection (the booking lock, the bid row lock), and the test must turn red. Mutation testing (Q2) turns that habit into a measured score.
+**Reading the numbers honestly:** coverage tells you which code ran during tests, not whether the tests check the right things. That is why the most important tests here were also checked the other way round: remove the protection (the booking lock, the bid row lock), and the test must turn red. Mutation testing (section 8) turns that habit into a measured score.
 
 ## 3. How coverage went from 80% / 60% to 94% / 85%
 
@@ -61,11 +64,11 @@ Things the new tests confirmed or taught along the way:
             ┌──────────────────────┐
             │ kind deploy + smoke   │  1 · real Kubernetes, probes, cluster DNS, SSR → API → DB
           ┌─┴──────────────────────┴─┐
-          │ browser click-through     │  Playwright on the Cloudflare build (scripted; CI in Q2)
+          │ browser + accessibility   │  40 · Playwright journeys, axe WCAG checks, desktop + phone
         ┌─┴──────────────────────────┴─┐
-        │ integration (Testcontainers)   │  69 · real PostgreSQL 16 · race tests · GraphQL API · demo bots
+        │ integration (Testcontainers)   │  70 · real PostgreSQL 16 · race tests · GraphQL API · ledger model
       ┌─┴──────────────────────────────┴─┐
-      │ unit (JUnit, Vitest)               │  322 · ledger rules, audit chain, pricing, auctions, API clients
+      │ unit + property-based              │  345 · money rules, auctions, ledger, API clients
       └────────────────────────────────────┘
                       ▼ faster · many · cheap
 ```
@@ -95,16 +98,17 @@ Large regulated firms (asset managers such as Fidelity) and trading firms (such 
 
 | Practice | Why it matters in finance | Typical tools | This project |
 |---|---|---|---|
-| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 322 unit tests |
-| Integration tests with real dependencies | Mocks hide SQL, transaction and locking bugs | Testcontainers | ✅ 69 tests on real PostgreSQL |
+| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 345 unit and property-based tests |
+| Integration tests with real dependencies | Mocks hide SQL, transaction and locking bugs | Testcontainers | ✅ 70 tests on real PostgreSQL |
 | Concurrency / race testing | Double spending and double booking are race conditions | Multi-thread tests, jcstress | ✅ 50-thread and 40-thread race tests |
 | Code coverage | A visible floor for untested code | JaCoCo, Istanbul/v8, SonarQube | ✅ JaCoCo + v8, shown on every run |
 | Quality gate | Merges blocked when quality drops | SonarQube gates, coverage thresholds | ✅ JaCoCo + Vitest thresholds fail CI below the floor |
 | Static analysis | Catches bug patterns before tests run | SonarQube, SpotBugs, Error Prone, ESLint | ✅ SpotBugs + Find Security Bugs, ESLint (zero warnings) |
 | Security scanning | Regulators expect SAST, dependency and secret scanning | CodeQL, OWASP Dependency-Check, Dependabot, Trivy, gitleaks | ✅ CodeQL, Trivy (dependencies, secrets, IaC, images), gitleaks |
-| End-to-end browser tests | The user's path works, not only the API | Playwright, Selenium, Cypress | ✅ scripted · 🔜 Q2 in CI, with accessibility checks (axe) |
-| Property-based testing | Finds edge cases nobody thought to write down | jqwik, fast-check, Hypothesis | 🔜 Q2 (ledger and pricing invariants) |
-| Mutation testing | Measures whether tests catch real bugs | PIT, Stryker | 🔜 Q2 |
+| End-to-end browser tests | The user's path works, not only the API | Playwright, Selenium, Cypress | ✅ Playwright in CI, desktop + phone |
+| Accessibility testing | Required for public-facing financial services (ADA, EU Accessibility Act) | axe-core, Lighthouse, manual screen-reader passes | ✅ axe on every page, light + dark |
+| Property-based testing | Finds edge cases nobody thought to write down | jqwik, fast-check, Hypothesis | ✅ jqwik + fast-check (auction, pricing, ledger, loans, fee) |
+| Mutation testing | Measures whether tests catch real bugs | PIT, Stryker | ✅ PIT, 99.2%, gated at 95% |
 | Differential / oracle testing | Compares an optimized system with a simple trusted one | Custom harnesses | ✅ in [order-book-engine](https://github.com/Cathy0326/order-book-engine) (120,000 random steps) |
 | Performance & latency | Tail latency matters in trading | JMH, HdrHistogram, Gatling, k6 | ✅ JMH + HdrHistogram in order-book-engine · 💡 load test later |
 | Architecture rules | Keeps a large codebase modular | ArchUnit, Spring Modulith | ✅ Spring Modulith verification test |
@@ -142,8 +146,59 @@ Four SpotBugs findings were reviewed and excluded **with written reasons** (CSRF
 
 **Dependabot is deliberately not enabled.** It opens pull requests as `dependabot[bot]`, and merging them adds a bot to the repository's contributors. Trivy's dependency scan provides the same detection; upgrades are applied by hand, as with the Tomcat and Jackson pins above.
 
-## 8. Next stage (Q2b)
+## 8. Property-based, mutation and browser testing
 
-1. **Property-based tests:** jqwik for the ledger (any random sequence of postings stays balanced) and fast-check for pricing.
-2. **Mutation testing:** PIT on the ledger, escrow and rental modules, with the score in the quality report.
-3. **Browser tests in CI:** the Playwright click-through as a CI job, plus axe accessibility checks.
+### 8.1 Property-based tests: rules, not examples
+
+An example test checks one input you thought of. A property test states a rule and checks it against hundreds of generated inputs; when one fails, the tool **shrinks** it to the smallest input that still fails.
+
+| Property | Tool | What it states |
+|---|---|---|
+| Bidding wars | jqwik, fast-check | After every accepted bid in a random sequence of up to 30 bids: the leader offered the highest max (earliest on a tie), pays at least the runner-up's max and at most their own, the price and the end time never go backwards, and a lot sells exactly when the reserve is met |
+| Rental pricing | jqwik, fast-check | The quote equals a brute-force search over every month/week/day mix, the blocks add up to the total and cover every day, and a longer rental never costs less |
+| Loans | jqwik, fast-check | Every schedule repays exactly the principal, ends at a zero balance, and every row adds up; 0% APR means zero interest |
+| Platform fee | jqwik, fast-check | Within half a cent of 5%, between 0 and the price, never lower for a higher price |
+| Ledger | fast-check; seeded random model test against PostgreSQL | Any sequence of balanced entries keeps the trial balance balanced and the accounting equation true; any entry off by any amount is rejected; after 200 random postings each balance equals an in-memory model |
+| Money | fast-check | Parsing a displayed amount gives back the same cents |
+
+**What it found:** the first auction property failed with a shrunk two-bid case: two equal maxes in the same second. The engine was right (the earlier bid keeps the lead); the test's model broke the tie by timestamp instead of arrival order. Fixing the model made the rule precise: *time priority means arrival order*.
+
+**Proving the tests can fail:** a deliberately planted tie-break bug (`>` changed to `>=`) is caught by both suites. The frontend property did not catch it at first, because random maxes between 1 and 30,000,000 cents almost never collide. Maxes are now drawn in $1,000 steps, so ties happen, and that property runs 500 cases.
+
+### 8.2 Mutation testing: does the suite catch real bugs?
+
+PIT changes the compiled code one small step at a time (`<` to `<=`, `+` to `-`, a return value to 0, a call removed) and reruns the unit and property tests. Each changed version is a *mutant*; if no test fails, it *survived*: a bug the suite would ship.
+
+| Run | Score | Survivors |
+|---|---|---|
+| First | 92.4% (121/131) | Untested boundaries: a bid of exactly the minimum, a leader repeating their max, zero and negative bids, a max exactly at the reserve, the 365-day limit, the savings figure, a month costing the same as four weeks |
+| After adding boundary tests | 98.5% | The soft-close edge (a bid exactly 120 s before the end) had been covered only when a random property happened to hit that second |
+| Now | **99.2%** (130/131), stable across runs | One equivalent mutant (below) |
+
+The **equivalent mutant**: `principalPart > balance` changed to `>=` in the loan schedule. When the two are equal, setting `principalPart = balance` changes nothing, so no test can ever detect it. It is listed in the report rather than hidden with an exclusion.
+
+The month-versus-four-weeks tie became part of `contracts/money-rules.json`, so the backend, web and mobile suites all check it.
+
+### 8.3 Browser and accessibility tests
+
+Playwright runs the production build in demo-data mode (deterministic, no backend) on a desktop and a Pixel 7 viewport:
+
+| Journey | Checks |
+|---|---|
+| Catalog | Filtering by category narrows the list to the right count; a card opens the machine |
+| Rental | The quote shown equals the cheapest block mix computed by the same function the unit tests cover |
+| Auction | Registering a deposit hold, then a proxy bid takes the lead |
+| Escrow | Paying the balance moves the deal forward; every journal entry on the ledger page is balanced |
+
+axe-core checks WCAG 2.1 A and AA on all eight pages in light and dark mode. It found real problems, all fixed:
+
+| Finding | Fix |
+|---|---|
+| Secondary text, success and warning colours at 4.1 to 4.47:1 contrast (minimum 4.5:1) | Darker tokens; every pair recomputed |
+| `aria-label` on SVG chart rectangles without a role | The chart is a labelled group; each focusable bar is a labelled image |
+| Links in running text distinguished by colour only | Underlined inside paragraphs |
+| On a phone, wide tables scroll sideways but keyboard users could not reach them | Each scrolling table is a named, focusable region with a visible focus outline |
+
+The last one appeared only on the phone viewport, which is why both viewports run. Automated checks find roughly a third to a half of accessibility problems; keyboard and screen-reader passes remain manual.
+
+Failures keep a Playwright trace, a screenshot and the HTML report as CI artifacts, and the quality report counts the browser suite. Retries are off: a flaky browser test is treated as a bug.
