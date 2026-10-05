@@ -74,6 +74,11 @@
         "dailyCents": 10000,
         "weeklyCents": 60000,
         "monthlyCents": 300000
+      },
+      "monthTiesFourWeeks": {
+        "dailyCents": 100000,
+        "weeklyCents": 200000,
+        "monthlyCents": 800000
       }
     },
     "cases": [
@@ -508,6 +513,30 @@
         "months": 0,
         "weeks": 52,
         "days": 1
+      },
+      {
+        "rates": "monthTiesFourWeeks",
+        "rentalDays": 28,
+        "totalCents": 800000,
+        "months": 0,
+        "weeks": 4,
+        "days": 0
+      },
+      {
+        "rates": "monthTiesFourWeeks",
+        "rentalDays": 56,
+        "totalCents": 1600000,
+        "months": 0,
+        "weeks": 8,
+        "days": 0
+      },
+      {
+        "rates": "monthTiesFourWeeks",
+        "rentalDays": 30,
+        "totalCents": 1000000,
+        "months": 0,
+        "weeks": 4,
+        "days": 2
       }
     ]
   }

@@ -53,6 +53,8 @@ jobs:
           java-version: 21
           cache: maven
       - run: ./mvnw -B verify   # also writes the JaCoCo coverage report (unit + integration merged)
+      # Mutation testing of the money and auction rules: fails below the threshold in pom.xml (pitest-maven).
+      - run: ./mvnw -B -q org.pitest:pitest-maven:mutationCoverage
       - name: Upload test and coverage reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -62,9 +64,10 @@ jobs:
             backend/target/surefire-reports
             backend/target/failsafe-reports
             backend/target/site/jacoco
+            backend/target/pit-reports
 
   quality:
-    name: Quality report (pass rate + coverage)
+    name: Quality report (pass rate, coverage, mutation score)
     # Runs even when tests fail, so the report shows WHICH tests failed and the pass rate drops.
     needs: [frontend, backend]
     if: ${{ !cancelled() }}
