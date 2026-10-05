@@ -105,6 +105,16 @@ jobs:
         run: |
           docker run --rm -v "$PWD/k8s:/k8s" ghcr.io/yannh/kubeconform:latest \
             -strict -summary -ignore-missing-schemas -skip Kustomization /k8s
+      - name: Secrets in Git are encrypted (SOPS), and only there
+        run: |
+          plain=$(grep -rl --include='*.yaml' '^kind: Secret' k8s | grep -v '\.enc\.yaml$' || true)
+          [ -z "$plain" ] || { echo "::error::Plain-text Secret manifests: $plain (encrypt with sops as *.enc.yaml)"; exit 1; }
+          for f in $(find k8s -name '*.enc.yaml'); do
+            grep -q '^sops:' "$f" || { echo "::error::$f has no SOPS metadata: it is not encrypted"; exit 1; }
+            leaked=$(sed -n '/^stringData:/,/^[^ ]/p' "$f" | grep -E '^ +[A-Za-z0-9_]+: ' | grep -v 'ENC\[' || true)
+            [ -z "$leaked" ] || { echo "::error::$f has unencrypted values: $(echo "$leaked" | cut -d: -f1 | xargs)"; exit 1; }
+            echo "ok: $f"
+          done
       - name: Render and validate every environment overlay
         run: |
           for env in dev staging prod ci; do

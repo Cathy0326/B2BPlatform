@@ -119,6 +119,7 @@ jobs:
       BACKEND_DIGEST: ${{ needs.resolve.outputs.backend }}
       FRONTEND_DIGEST: ${{ needs.resolve.outputs.frontend }}
       KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }} # this environment's private age key: decrypts only its own Secret
     steps:
       - uses: actions/checkout@v4
         with:
@@ -145,14 +146,29 @@ jobs:
         with:
           name: manifests-${{ needs.resolve.outputs.environment }}-${{ needs.resolve.outputs.sha }}
           path: rendered.yaml
+      - name: Install SOPS (official release, checksum verified)
+        if: env.KUBECONFIG_B64 != '' && env.SOPS_AGE_KEY != ''
+        run: |
+          v=3.10.2
+          base=https://github.com/getsops/sops/releases/download/v$v
+          curl -sSfLO "$base/sops-v$v.linux.amd64"
+          curl -sSfLO "$base/sops-v$v.checksums.txt"
+          sha256sum --ignore-missing -c "sops-v$v.checksums.txt"
+          install -m 0755 "sops-v$v.linux.amd64" "$RUNNER_TEMP/sops"
       - name: Apply and wait for the rollout
         if: env.KUBECONFIG_B64 != ''
         run: |
           echo "$KUBECONFIG_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig"
           export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
           ns=$(grep -m1 -A3 '^kind: Namespace' rendered.yaml | sed -n 's/^  name: //p')
+          # Namespace first (with its Pod Security labels), then the Secret, then the workloads that need it.
+          yq 'select(.kind == "Namespace")' rendered.yaml | kubectl apply -f -
+          if [ -n "$SOPS_AGE_KEY" ]; then
+            # Decrypted only in memory and piped straight to the API server; never written to disk or logs.
+            "$RUNNER_TEMP/sops" -d "k8s/overlays/$OVERLAY/backend-secrets.enc.yaml" | kubectl apply -f -
+          fi
           kubectl -n "$ns" get secret backend-secrets >/dev/null \
-            || { echo "::error::Secret backend-secrets is missing in namespace $ns. Create it before the first deploy."; exit 1; }
+            || { echo "::error::Secret backend-secrets is missing in $ns: add this environment's SOPS_AGE_KEY secret."; exit 1; }
           kubectl apply -f rendered.yaml
           for d in backend frontend; do kubectl -n "$ns" rollout status "deployment/$d" --timeout=300s; done
       - name: Summary

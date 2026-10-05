@@ -64,9 +64,13 @@ variable "db_type" {
 }
 
 variable "db_allow_list" {
-  description = "CIDRs allowed to reach PostgreSQL. Add the LKE node IPs (or use a VPC). Empty = nobody."
+  description = "CIDRs allowed to reach PostgreSQL: the LKE node IPs (each /32). Empty = nobody."
   type        = list(string)
   default     = []
+  validation {
+    condition     = alltrue([for cidr in var.db_allow_list : !contains(["0.0.0.0/0", "::/0"], cidr)])
+    error_message = "Opening the database to the whole internet is not allowed; list the cluster node IPs."
+  }
 }
 
 variable "ingress_ip" {

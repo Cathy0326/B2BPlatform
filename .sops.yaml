@@ -1,0 +1,24 @@
+# SOPS encryption rules: which age public keys can decrypt which files.
+# Each environment's Secret is encrypted to two keys:
+#   - the environment key: its private half is the SOPS_AGE_KEY secret of that GitHub Environment only, so the
+#     staging deploy job can never read production secrets (and production deploys need an approval first)
+#   - the admin key: kept offline in a password manager, for editing and break-glass access
+# Only values under data/stringData are encrypted; names and keys stay readable, so diffs and reviews still work.
+# Edit:   sops k8s/overlays/staging/backend-secrets.enc.yaml      (needs one of the private keys)
+# Rotate: change a key below, then  sops updatekeys <file>
+creation_rules:
+  - path_regex: k8s/overlays/dev/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age1kmctt784z48tsg5a6fr73xl2qyvj3mum779a2lj047763hu3d4kq78rz4p,
+      age1vp848pseujzjtufxqldr79afdc0u5dyr7ajf52yclz36hex0xuystye25u
+  - path_regex: k8s/overlays/staging/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age1edcgwdu2kjdqce8u3mv9pujt3ev0cj49s5ex4vlr42at4uucufqskrge2n,
+      age1vp848pseujzjtufxqldr79afdc0u5dyr7ajf52yclz36hex0xuystye25u
+  - path_regex: k8s/overlays/prod/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age1wfxgqsvpc5xza6g2zd0mznem9an4c95uskj6250e8twkq8f0s9ssy83lv5,
+      age1vp848pseujzjtufxqldr79afdc0u5dyr7ajf52yclz36hex0xuystye25u

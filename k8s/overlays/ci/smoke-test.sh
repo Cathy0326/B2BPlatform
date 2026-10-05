@@ -5,6 +5,8 @@
 #   2. both backend replicas are Ready (the production manifest runs 2)
 #   3. the backend answers GraphQL with data it read from PostgreSQL through the Service DNS name
 #   4. the frontend's server-side render fetched that data from the backend over cluster DNS
+#   5. the hardening is enforced, not just declared: Pod Security rejects a privileged pod, and the
+#      NetworkPolicies block a pod that is neither ingress-nginx nor the frontend from reaching the backend
 set -euo pipefail
 KUBECTL=${KUBECTL:-kubectl}
 NS=quipmarket
@@ -45,5 +47,22 @@ grep -q 'live GraphQL API' /tmp/home.html || { echo "frontend is not in GraphQL 
 first_id=$(grep -o '"id":"eq-[^"]*"' /tmp/gql.json | head -1 | cut -d'"' -f4)
 grep -q "/equipment/$first_id" /tmp/home.html || { echo "SSR page does not list $first_id from the API"; exit 1; }
 echo "server-rendered home page lists $first_id from the backend"
+
+echo "== Pod Security Admission rejects a privileged pod"
+if out=$(k run psa-probe --image=busybox:1.37 --privileged --restart=Never --dry-run=server 2>&1); then
+  echo "a privileged pod was admitted: $out"; exit 1
+fi
+echo "$out" | grep -q 'violates PodSecurity' || { echo "unexpected error: $out"; exit 1; }
+echo "rejected: $(echo "$out" | grep -o 'violates PodSecurity "restricted[^"]*"')"
+
+echo "== NetworkPolicy blocks an unlisted pod from the backend"
+probe='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},
+  "containers":[{"name":"np-probe","image":"busybox:1.37",
+  "command":["sh","-c","nslookup backend >/dev/null 2>&1 || { echo NO-DNS; exit 0; }; wget -q -T 5 -O /dev/null http://backend:8080/actuator/health/readiness && echo REACHED || echo BLOCKED"],
+  "securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}'
+result=$(k run np-probe --image=busybox:1.37 --restart=Never --rm -i --quiet --pod-running-timeout=2m --overrides="$probe" 2>&1 | tail -1)
+echo "probe: $result"
+# BLOCKED only counts if the name resolved, i.e. the connection itself was refused by the policy.
+[ "$result" = BLOCKED ] || { echo "expected BLOCKED (DNS works, connection denied), got: $result"; exit 1; }
 
 echo "✅ Smoke test passed"
