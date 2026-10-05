@@ -24,7 +24,7 @@ python3 scripts/quality-report.py      # prints the same report CI shows
 
 | Metric | Value |
 |---|---|
-| Automated tests | **257**: 79 backend unit + 69 backend integration + 109 frontend unit |
+| Automated tests | **391**: 146 backend unit + 69 backend integration + 176 frontend unit (each unit suite includes the 67 cases of the shared money-rule contract, which the Kotlin mobile module also runs on JVM, Android and iOS) |
 | Pass rate on `main` | **100%** (CI blocks merging anything red) |
 | Backend line coverage (JaCoCo, unit + integration) | **93.7%** (1,331 / 1,420 lines) |
 | Backend branch coverage | **85.3%** |
@@ -65,7 +65,7 @@ Things the new tests confirmed or taught along the way:
         ┌─┴──────────────────────────┴─┐
         │ integration (Testcontainers)   │  69 · real PostgreSQL 16 · race tests · GraphQL API · demo bots
       ┌─┴──────────────────────────────┴─┐
-      │ unit (JUnit, Vitest)               │  188 · ledger rules, audit chain, pricing, auctions, API clients
+      │ unit (JUnit, Vitest)               │  322 · ledger rules, audit chain, pricing, auctions, API clients
       └────────────────────────────────────┘
                       ▼ faster · many · cheap
 ```
@@ -95,7 +95,7 @@ Large regulated firms (asset managers such as Fidelity) and trading firms (such 
 
 | Practice | Why it matters in finance | Typical tools | This project |
 |---|---|---|---|
-| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 188 unit tests |
+| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 322 unit tests |
 | Integration tests with real dependencies | Mocks hide SQL, transaction and locking bugs | Testcontainers | ✅ 69 tests on real PostgreSQL |
 | Concurrency / race testing | Double spending and double booking are race conditions | Multi-thread tests, jcstress | ✅ 50-thread and 40-thread race tests |
 | Code coverage | A visible floor for untested code | JaCoCo, Istanbul/v8, SonarQube | ✅ JaCoCo + v8, shown on every run |

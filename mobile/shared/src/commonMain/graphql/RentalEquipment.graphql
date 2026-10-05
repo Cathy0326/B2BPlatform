@@ -1,0 +1,18 @@
+# Checked against backend/src/main/resources/graphql/schema.graphqls at build time.
+query RentalEquipment {
+  equipment(filter: { listing: RENT }) {
+    id
+    title
+    category
+    make
+    model
+    year
+    hours
+    location
+    rentalRates {
+      dailyCents
+      weeklyCents
+      monthlyCents
+    }
+  }
+}

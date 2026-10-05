@@ -1,6 +1,6 @@
 # QuipMarket
 
-[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml) [![Security](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml) [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/tests.json)](docs/QUALITY.md) [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-backend.json)](docs/QUALITY.md) [![Frontend logic coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-frontend.json)](docs/QUALITY.md)
+[![CI](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/ci.yml) [![Security](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/security.yml) [![Mobile](https://github.com/Cathy0326/B2BPlatform/actions/workflows/mobile.yml/badge.svg)](https://github.com/Cathy0326/B2BPlatform/actions/workflows/mobile.yml) [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/tests.json)](docs/QUALITY.md) [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-backend.json)](docs/QUALITY.md) [![Frontend logic coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Cathy0326/B2BPlatform/badges/coverage-frontend.json)](docs/QUALITY.md)
 
 **Heavy-equipment auctions, rentals & escrow settlement**, a B2B marketplace where bids can't race, bookings can't double-book, and every dollar is traceable through a double-entry ledger.
 
@@ -15,6 +15,7 @@
 | Layer | Tech |
 |---|---|
 | Frontend | Nuxt 4 (Vue 3, TypeScript, SSR), Stripe Elements, Auth0 SPA SDK |
+| Mobile | Kotlin Multiplatform: shared money rules, rental pricing and an Apollo Kotlin GraphQL client for Android (Jetpack Compose app) and iOS (XCFramework), tested on JVM, Android and the iOS simulator |
 | Backend | Java 21, Spring Boot 4.1, Spring for GraphQL (queries, mutations, WebSocket subscriptions), modular monolith verified by Spring Modulith |
 | Data | PostgreSQL 16, Flyway, plain SQL via `JdbcClient`, LISTEN/NOTIFY for cross-replica events |
 | Payments | `PaymentGateway` strategy: simulated (default) or Stripe test mode (PaymentIntents, manual capture, signed webhooks) |
@@ -63,21 +64,21 @@ cd frontend && NUXT_PUBLIC_GRAPHQL_URL=http://localhost:8080/graphql npm run dev
 
 **Tests:**
 ```bash
-cd frontend && npm test && npm run typecheck     # 109 unit tests (npm run test:ci adds coverage + the coverage gate)
-cd backend  && ./mvnw verify                     # 79 unit + 69 Testcontainers integration tests + JaCoCo coverage gate
+cd frontend && npm test && npm run typecheck     # 176 unit tests (npm run test:ci adds coverage + the coverage gate)
+cd backend  && ./mvnw verify                     # 146 unit + 69 Testcontainers integration tests + JaCoCo coverage gate
 ```
 
 Windows (PowerShell) steps, Stripe test mode and Auth0 setup are in the handover docs.
 
 ## Quality
 
-**257 automated tests, 100% passing on `main`** · backend coverage **94% lines / 85% branches** (unit + integration) · frontend logic coverage **99% lines / 89% branches** · CI fails if coverage drops below its floor · CodeQL, Trivy, gitleaks, SpotBugs and ESLint on every push · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
+**391 automated tests, 100% passing on `main`** · backend coverage **94% lines / 85% branches** (unit + integration) · frontend logic coverage **99% lines / 89% branches** · CI fails if coverage drops below its floor · CodeQL, Trivy, gitleaks, SpotBugs and ESLint on every push · every push deploys to a throwaway Kubernetes cluster and smoke-tests it.
 
 ```
   kind deploy + smoke test      1   real Kubernetes: probes, cluster DNS, SSR → API → PostgreSQL
   browser click-through             Playwright on the Cloudflare build
   integration (Testcontainers)  69  real PostgreSQL 16, 50-thread race tests, GraphQL API, demo bots
-  unit (JUnit + Vitest)        188  ledger rules, audit hash chain, pricing, auction engine, payments, API clients
+  unit (JUnit + Vitest)        322  ledger rules, audit hash chain, pricing, auction engine, payments, API clients, shared money-rule contract
 ```
 
 Each CI run's *Summary* tab shows the full report: pass rate per suite, failing tests by name, and coverage per module. See [docs/QUALITY.md](docs/QUALITY.md) for the approach, and for how it maps to testing practices common at financial and trading firms.
@@ -90,6 +91,8 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | [Phase 2](docs/handover/phase-2.md) | Spring Boot GraphQL + PostgreSQL, concurrency, N+1, subscriptions |
 | [Phase 3](docs/handover/phase-3.md) | Payments (Stripe), escrow saga, double-entry ledger, idempotency, webhooks, audit chain |
 | [Phase 4](docs/handover/phase-4.md) | Auth0, rate limiting, LISTEN/NOTIFY, Docker, CI, Kubernetes, OpenTofu |
+| [Phase 5](docs/handover/phase-5.md) | Environments and deploy pipeline, SOPS secrets, hardening, Kotlin Multiplatform, ClickUp workflow |
+| [Mobile](mobile/README.md) | Kotlin Multiplatform shared module, Android app, iOS framework, the money-rule contract shared by all clients |
 | [Quality](docs/QUALITY.md) | Test pyramid, pass rate and coverage, security scanning and static analysis, enterprise testing practices |
 | [Capstone](docs/CAPSTONE.md) | Architecture, resume bullets, interview stories, demo script |
 
@@ -103,3 +106,4 @@ Each CI run's *Summary* tab shows the full report: pass rate per suite, failing 
 | 2 | Spring Boot GraphQL + PostgreSQL: catalog, rentals, authoritative auction engine, live updates | ✅ |
 | 3 | Ledger, escrow, idempotency, Stripe test mode, webhooks, audit hash chain | ✅ |
 | 4 | Auth0, rate limiting, multi-replica events, Docker, CI, Kubernetes, OpenTofu | ✅ |
+| 5 | dev/staging/prod with promote-by-digest deploys, SOPS secrets, Pod Security + NetworkPolicies, Kotlin Multiplatform mobile | ✅ |
