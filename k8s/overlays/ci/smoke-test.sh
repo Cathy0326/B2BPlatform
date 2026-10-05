@@ -56,9 +56,11 @@ echo "$out" | grep -q 'violates PodSecurity' || { echo "unexpected error: $out";
 echo "rejected: $(echo "$out" | grep -o 'violates PodSecurity "restricted[^"]*"')"
 
 echo "== NetworkPolicy blocks an unlisted pod from the backend"
+# Full service name: busybox's nslookup does not apply the pod's DNS search domains to a short name.
+svc="backend.$NS.svc.cluster.local"
 probe='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},
   "containers":[{"name":"np-probe","image":"busybox:1.37",
-  "command":["sh","-c","nslookup backend >/dev/null 2>&1 || { echo NO-DNS; exit 0; }; wget -q -T 5 -O /dev/null http://backend:8080/actuator/health/readiness && echo REACHED || echo BLOCKED"],
+  "command":["sh","-c","nslookup '"$svc"' >/dev/null 2>&1 || { echo NO-DNS; exit 0; }; wget -q -T 5 -O /dev/null http://'"$svc"':8080/actuator/health/readiness && echo REACHED || echo BLOCKED"],
   "securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}'
 result=$(k run np-probe --image=busybox:1.37 --restart=Never --rm -i --quiet --pod-running-timeout=2m --overrides="$probe" 2>&1 | tail -1)
 echo "probe: $result"
