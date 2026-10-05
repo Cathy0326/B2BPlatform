@@ -148,6 +148,13 @@
       <artifactId>spring-modulith-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Property-based testing: generates hundreds of random inputs per rule and shrinks a failure to the smallest case. -->
+    <dependency>
+      <groupId>net.jqwik</groupId>
+      <artifactId>jqwik</artifactId>
+      <version>1.10.1</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

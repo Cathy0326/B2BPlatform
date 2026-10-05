@@ -27,6 +27,7 @@
     "@nuxt/eslint": "^1.17.0",
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.12.0",
+    "fast-check": "^4.10.2",
     "typescript": "~5.9.3",
     "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12"

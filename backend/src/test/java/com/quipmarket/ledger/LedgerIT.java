@@ -5,7 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.quipmarket.ledger.Ledger.Line;
 import com.quipmarket.support.IntegrationTest;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -94,5 +98,61 @@ class LedgerIT {
         assertThat(ledger.entries(ref, 10)).singleElement().satisfies(e -> assertThat(e.reference()).isEqualTo(ref));
         assertThat(ledger.entries(null, 500)).extracting(Ledger.Entry::reference).contains(ref);
         assertThat(ledger.entries(null, 1)).hasSize(1);
+    }
+
+    /**
+     * Randomized model check against the real database: 200 random entries (2 to 6 lines over a pool of accounts),
+     * one in five deliberately off by a few cents. Every unbalanced entry must be rejected without a trace, every
+     * balanced one posted, and afterwards each account's balance must equal a simple in-memory model and the trial
+     * balance must still balance. The seed is fixed, so a failure replays exactly.
+     */
+    @Test
+    void randomPostingSequencesKeepTheBooksBalanced() {
+        long seed = 20261005L;
+        Random rnd = new Random(seed);
+        List<String> pool = List.of("platform_cash", acct("p1"), acct("p2"), acct("p3"), acct("p4"));
+        Map<String, Long> expected = new HashMap<>(); // debits - credits per account, as the model sees it
+        pool.forEach(a -> expected.put(a, ledger.balanceOf(a) * (a.equals("platform_cash") ? 1 : -1)));
+        int rejected = 0;
+
+        for (int i = 0; i < 200; i++) {
+            List<Line> lines = new ArrayList<>();
+            long debits = 0;
+            int debitLines = 1 + rnd.nextInt(3), creditLines = 1 + rnd.nextInt(3);
+            for (int d = 0; d < debitLines; d++) {
+                long cents = 100 + rnd.nextInt(1_000_000);
+                debits += cents;
+                lines.add(Line.debit(pool.get(rnd.nextInt(pool.size())), cents));
+            }
+            long left = debits;
+            for (int c = 0; c < creditLines; c++) {
+                long cents = c == creditLines - 1 ? left : 1 + rnd.nextLong(left - (creditLines - c - 1));
+                left -= cents;
+                lines.add(Line.credit(pool.get(rnd.nextInt(pool.size())), cents));
+            }
+            boolean unbalanced = rnd.nextInt(5) == 0;
+            if (unbalanced) {
+                Line last = lines.removeLast();
+                lines.add(Line.credit(last.accountCode(), last.creditCents() + 1 + rnd.nextInt(50)));
+            }
+
+            String ref = "rnd-" + seed + "-" + i + "-" + System.nanoTime();
+            if (unbalanced) {
+                assertThatThrownBy(() -> ledger.post("RANDOM", ref, "random", lines))
+                        .as("seed %d, entry %d", seed, i).hasMessageContaining("Unbalanced");
+                rejected++;
+            } else {
+                ledger.post("RANDOM", ref, "random", lines);
+                lines.forEach(l -> expected.merge(l.accountCode(), l.debitCents() - l.creditCents(), Long::sum));
+            }
+        }
+
+        assertThat(rejected).as("the generator really produced unbalanced entries").isPositive();
+        for (String a : pool) {
+            long debitMinusCredit = expected.get(a);
+            long balance = a.equals("platform_cash") ? debitMinusCredit : -debitMinusCredit; // ASSET vs LIABILITY
+            assertThat(ledger.balanceOf(a)).as("seed %d, account %s", seed, a).isEqualTo(balance);
+        }
+        assertThat(ledger.trialBalance().balanced()).isTrue();
     }
 }
