@@ -30,4 +30,15 @@ class LedgerRulesTest {
         assertThat(Ledger.Line.debit("a", 5)).isEqualTo(new Ledger.Line("a", 5, 0));
         assertThat(Ledger.Line.credit("a", 5)).isEqualTo(new Ledger.Line("a", 0, 5));
     }
+
+    @Test
+    void aPostedEntryCannotChangeEvenInMemory() {
+        var lines = new java.util.ArrayList<>(List.of(Ledger.Line.debit("cash", 100), Ledger.Line.credit("fees", 100)));
+        var entry = new Ledger.Entry(1, "TEST", "ref", "", java.time.Instant.EPOCH, lines);
+
+        lines.add(Ledger.Line.debit("cash", 999)); // the caller changes its own list afterwards...
+        assertThat(entry.lines()).hasSize(2);       // ...the entry is unaffected
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> entry.lines().add(Ledger.Line.debit("x", 1)))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
 }

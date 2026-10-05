@@ -17,15 +17,15 @@ const breakEven = computed(() =>
     <div class="inputs" :class="{ compact }">
       <label class="field">
         Equipment price
-        <div class="input-prefix"><span>$</span><input v-model.number="form.price" type="number" min="0" step="1000" /></div>
+        <div class="input-prefix"><span>$</span><input v-model.number="form.price" type="number" min="0" step="1000" ></div>
       </label>
       <label class="field">
         Down payment ({{ form.downPaymentPercent }}%)
-        <input v-model.number="form.downPaymentPercent" type="range" min="0" max="50" step="5" />
+        <input v-model.number="form.downPaymentPercent" type="range" min="0" max="50" step="5" >
       </label>
       <label class="field">
         APR (%)
-        <input v-model.number="form.aprPercent" type="number" min="0" max="50" step="0.25" />
+        <input v-model.number="form.aprPercent" type="number" min="0" max="50" step="0.25" >
       </label>
       <label class="field">
         Term

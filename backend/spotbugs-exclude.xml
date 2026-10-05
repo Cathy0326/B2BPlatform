@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Every exclusion needs a reason. Prefer fixing the code; exclude only false positives or deliberate designs.
+  Reviewed findings that were FIXED instead (see git history): mutable lists in records (defensive copies),
+  hash comparison in Idempotency (constant-time), throwing constructor in StripePaymentGateway (final class).
+-->
+<FindBugsFilter>
+  <!-- CSRF needs a browser to attach credentials automatically (cookies). This API is stateless and has no cookie
+       auth: Auth0 tokens travel in the Authorization header and demo identity in X-User-Id, and a cross-site form
+       cannot set either header. CORS is restricted to the frontend origin. -->
+  <Match>
+    <Class name="com.quipmarket.shared.SecurityConfig"/>
+    <Bug pattern="SPRING_CSRF_PROTECTION_DISABLED"/>
+  </Match>
+
+  <!-- reject() writes a JSON error whose message and code are compile-time constants chosen by this class,
+       never request data, with Content-Type application/json. No user input reaches the response. -->
+  <Match>
+    <Class name="com.quipmarket.shared.RateLimitFilter"/>
+    <Method name="reject"/>
+    <Bug pattern="XSS_SERVLET"/>
+  </Match>
+
+  <!-- SQL text blocks passed to String.formatted(): the newline style inside SQL is irrelevant to PostgreSQL. -->
+  <Match>
+    <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+  </Match>
+
+  <!-- java.util.Random only decides how demo bots bid in the demo profile; it is never used for tokens, ids or keys. -->
+  <Match>
+    <Class name="com.quipmarket.auction.internal.demo.DemoAuctions"/>
+    <Bug pattern="PREDICTABLE_RANDOM"/>
+  </Match>
+</FindBugsFilter>

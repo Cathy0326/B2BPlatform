@@ -19,7 +19,7 @@ import com.stripe.param.PaymentIntentCreateParams;
  *
  * Safety: refuses to start with a live key (sk_live_...). This is a demo.
  */
-class StripePaymentGateway implements PaymentGateway {
+final class StripePaymentGateway implements PaymentGateway { // final: a constructor that throws must not be subclassable
 
     private final StripeClient stripe;
 

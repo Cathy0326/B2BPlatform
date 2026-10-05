@@ -24,7 +24,7 @@ python3 scripts/quality-report.py      # prints the same report CI shows
 
 | Metric | Value |
 |---|---|
-| Automated tests | **256**: 78 backend unit + 69 backend integration + 109 frontend unit |
+| Automated tests | **257**: 79 backend unit + 69 backend integration + 109 frontend unit |
 | Pass rate on `main` | **100%** (CI blocks merging anything red) |
 | Backend line coverage (JaCoCo, unit + integration) | **93.7%** (1,331 / 1,420 lines) |
 | Backend branch coverage | **85.3%** |
@@ -65,7 +65,7 @@ Things the new tests confirmed or taught along the way:
         ┌─┴──────────────────────────┴─┐
         │ integration (Testcontainers)   │  69 · real PostgreSQL 16 · race tests · GraphQL API · demo bots
       ┌─┴──────────────────────────────┴─┐
-      │ unit (JUnit, Vitest)               │  187 · ledger rules, audit chain, pricing, auctions, API clients
+      │ unit (JUnit, Vitest)               │  188 · ledger rules, audit chain, pricing, auctions, API clients
       └────────────────────────────────────┘
                       ▼ faster · many · cheap
 ```
@@ -95,13 +95,13 @@ Large regulated firms (asset managers such as Fidelity) and trading firms (such 
 
 | Practice | Why it matters in finance | Typical tools | This project |
 |---|---|---|---|
-| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 187 unit tests |
+| Unit testing | Every money rule needs a test | JUnit, AssertJ, Mockito, Jest/Vitest | ✅ 188 unit tests |
 | Integration tests with real dependencies | Mocks hide SQL, transaction and locking bugs | Testcontainers | ✅ 69 tests on real PostgreSQL |
 | Concurrency / race testing | Double spending and double booking are race conditions | Multi-thread tests, jcstress | ✅ 50-thread and 40-thread race tests |
 | Code coverage | A visible floor for untested code | JaCoCo, Istanbul/v8, SonarQube | ✅ JaCoCo + v8, shown on every run |
 | Quality gate | Merges blocked when quality drops | SonarQube gates, coverage thresholds | ✅ JaCoCo + Vitest thresholds fail CI below the floor |
-| Static analysis | Catches bug patterns before tests run | SonarQube, SpotBugs, Error Prone, ESLint | 🔜 Q2 |
-| Security scanning | Regulators expect SAST, dependency and secret scanning | CodeQL, OWASP Dependency-Check, Dependabot, Trivy, gitleaks | 🔜 Q2 |
+| Static analysis | Catches bug patterns before tests run | SonarQube, SpotBugs, Error Prone, ESLint | ✅ SpotBugs + Find Security Bugs, ESLint (zero warnings) |
+| Security scanning | Regulators expect SAST, dependency and secret scanning | CodeQL, OWASP Dependency-Check, Dependabot, Trivy, gitleaks | ✅ CodeQL, Trivy (dependencies, secrets, IaC, images), gitleaks |
 | End-to-end browser tests | The user's path works, not only the API | Playwright, Selenium, Cypress | ✅ scripted · 🔜 Q2 in CI, with accessibility checks (axe) |
 | Property-based testing | Finds edge cases nobody thought to write down | jqwik, fast-check, Hypothesis | 🔜 Q2 (ledger and pricing invariants) |
 | Mutation testing | Measures whether tests catch real bugs | PIT, Stryker | 🔜 Q2 |
@@ -112,10 +112,38 @@ Large regulated firms (asset managers such as Fidelity) and trading firms (such 
 | Contract tests | Frontend and backend agree on the API | Pact, GraphQL schema checks | 💡 later |
 | Audit trail | Regulators require tamper evidence | Append-only logs, hash chains | ✅ SHA-256 hash chain, tamper tests |
 
-## 7. Next stage (Q2)
+## 7. Security scanning and static analysis
 
-1. **Security scanning:** CodeQL (code), Dependabot (dependencies), Trivy (container images), gitleaks (secrets).
-2. **Static analysis:** SpotBugs for Java, ESLint for TypeScript (the coverage gate is already in place).
-3. **Property-based tests:** jqwik for the ledger (any random sequence of postings stays balanced) and fast-check for pricing.
-4. **Mutation testing:** PIT on the ledger, escrow and rental modules, with the score in the quality report.
-5. **Browser tests in CI:** the Playwright click-through as a CI job, plus axe accessibility checks.
+| Tool | What it checks | Runs | Fails the build on |
+|---|---|---|---|
+| **CodeQL** (`security-extended`) | Source code of Java and TypeScript for injection, unsafe deserialization, path traversal and similar | Every PR, `main`, weekly | New alerts appear on the PR and in the Security tab |
+| **Trivy**, repository scan | Dependency lockfiles for known CVEs, files for secrets, Dockerfiles / Kubernetes / OpenTofu for misconfiguration | Every PR, `main`, weekly | Fixable HIGH/CRITICAL vulnerabilities, HIGH/CRITICAL misconfigurations, any secret |
+| **Trivy**, image scan | Both built container images (OS packages and bundled libraries) | Every PR, `main`, weekly | Fixable CRITICAL vulnerabilities |
+| **gitleaks** | Every commit in the git history for committed secrets | Every PR, `main`, weekly | Any finding |
+| **SpotBugs + Find Security Bugs** | Java bytecode for bug patterns and OWASP-style security issues | Every backend build (`mvn verify`) | Any finding not justified in `backend/spotbugs-exclude.xml` |
+| **ESLint** (Nuxt rules) | Vue and TypeScript code | Every frontend build | Any error or warning |
+
+All scanners upload to the **Security tab** (Security → Code scanning), so findings have one place to be triaged. The weekly run matters: a library can become vulnerable without any change in this repository.
+
+**What the first runs found, and what was done:**
+
+| Finding | Severity | Action |
+|---|---|---|
+| Tomcat 11.0.24 (via Spring Boot 4.1.1): three authentication / security-constraint bypasses | CRITICAL | Pinned Tomcat 11.0.26 in `pom.xml` (latest patch of the same minor), with the CVE ids, until a Spring Boot release ships it |
+| Jackson 3.1.5: three denial-of-service issues from malicious JSON | HIGH | Pinned Jackson 3.1.7, same approach |
+| Records holding mutable lists (8 records, including ledger entries), and the ledger reader appending to an entry *after* creating it | Bug pattern | Defensive copies in every record; the ledger reader now builds each entry once. A test proves a posted entry cannot change, even in memory |
+| Idempotency check compared request hashes with `String.equals` | Security (timing) | Constant-time `MessageDigest.isEqual` |
+| Stripe gateway constructor can throw (finalizer attack) | Bug pattern | Class made `final` |
+| CI-only PostgreSQL manifest ran as root with a writable root filesystem | HIGH (IaC) | Hardened like the app pods: non-root, read-only root filesystem, no capabilities, writes only to `emptyDir` volumes |
+| A fake webhook secret in the integration tests | Secret | Narrow gitleaks allowlist (that exact value in that exact file); a realistic key anywhere else is still caught |
+| 13 self-closing HTML void elements | Lint | Auto-fixed |
+
+Four SpotBugs findings were reviewed and excluded **with written reasons** (CSRF on a cookieless API, constant error messages flagged as XSS, newlines in SQL format strings, `Random` in demo bots); see `backend/spotbugs-exclude.xml`.
+
+**Dependabot is deliberately not enabled.** It opens pull requests as `dependabot[bot]`, and merging them adds a bot to the repository's contributors. Trivy's dependency scan provides the same detection; upgrades are applied by hand, as with the Tomcat and Jackson pins above.
+
+## 8. Next stage (Q2b)
+
+1. **Property-based tests:** jqwik for the ledger (any random sequence of postings stays balanced) and fast-check for pricing.
+2. **Mutation testing:** PIT on the ledger, escrow and rental modules, with the score in the quality report.
+3. **Browser tests in CI:** the Playwright click-through as a CI job, plus axe accessibility checks.

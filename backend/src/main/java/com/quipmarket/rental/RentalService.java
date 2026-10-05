@@ -13,6 +13,10 @@ import java.util.List;
 public interface RentalService {
 
     record Quote(RentalPricing.Price price, List<Booking> conflicts, LocalDate nextAvailableStart) {
+        public Quote {
+            conflicts = List.copyOf(conflicts);
+        }
+
         public boolean available() {
             return conflicts.isEmpty();
         }

@@ -50,7 +50,7 @@ function onMaxPrice(v: string) {
 
     <label class="field">
       Search
-      <input v-model="search" type="search" placeholder="e.g. cat excavator" />
+      <input v-model="search" type="search" placeholder="e.g. cat excavator" >
     </label>
 
     <fieldset>
@@ -72,7 +72,7 @@ function onMaxPrice(v: string) {
     <fieldset>
       <legend>Category</legend>
       <label v-for="[value, label] in categories" :key="value" class="check">
-        <input type="checkbox" :checked="filter.categories.includes(value)" @change="toggleCategory(value)" />
+        <input type="checkbox" :checked="filter.categories.includes(value)" @change="toggleCategory(value)" >
         {{ label }}
       </label>
     </fieldset>
@@ -87,7 +87,7 @@ function onMaxPrice(v: string) {
         placeholder="Any"
         :value="filter.maxPriceCents == null ? '' : filter.maxPriceCents / 100"
         @change="onMaxPrice(($event.target as HTMLInputElement).value)"
-      />
+      >
     </label>
 
     <div class="pair">
@@ -100,7 +100,7 @@ function onMaxPrice(v: string) {
           placeholder="Any"
           :value="filter.minYear ?? ''"
           @change="emit('update', { minYear: numberOrNull(($event.target as HTMLInputElement).value) })"
-        />
+        >
       </label>
       <label class="field">
         Max hours
@@ -111,13 +111,13 @@ function onMaxPrice(v: string) {
           placeholder="Any"
           :value="filter.maxHours ?? ''"
           @change="emit('update', { maxHours: numberOrNull(($event.target as HTMLInputElement).value) })"
-        />
+        >
       </label>
     </div>
 
     <label class="field">
       Location
-      <input v-model="location" type="text" placeholder="City or state, e.g. TX" />
+      <input v-model="location" type="text" placeholder="City or state, e.g. TX" >
     </label>
 
     <label class="field">

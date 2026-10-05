@@ -31,7 +31,11 @@ public final class LoanCalculator {
     public record Row(int month, long paymentCents, long principalCents, long interestCents, long balanceCents) {}
 
     public record Quote(long principalCents, long monthlyPaymentCents, long totalInterestCents, long totalPaidCents,
-                        long totalCostCents, List<Row> schedule) {}
+                        long totalCostCents, List<Row> schedule) {
+        public Quote {
+            schedule = List.copyOf(schedule);
+        }
+    }
 
     public static void validate(Input in) {
         if (in.priceCents() <= 0) throw new DomainException.InvalidInput("Price must be greater than 0.");

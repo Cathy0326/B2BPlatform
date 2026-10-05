@@ -1,0 +1,133 @@
+name: Security
+
+# Scanners run as official release binaries, pinned and checksum-verified, instead of third-party actions.
+# Every scanner uploads its full results to the repository's Security tab (code scanning).
+# Only problems someone can act on fail the build: fixable HIGH/CRITICAL vulnerabilities, HIGH/CRITICAL
+# misconfigurations and any committed secret. Failing on CVEs without a fix would keep CI red forever.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1' # Mondays: new CVEs are published even when our code does not change
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload results to the Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java-kotlin, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none            # analyses the source directly; no build needed
+          queries: security-extended  # the default queries plus more security checks
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  trivy-repo:
+    name: Trivy (dependencies, secrets, IaC)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      # Trivy needs every transitive dependency's POM to see e.g. Tomcat inside Spring Boot. Fetching them from
+      # Maven Central during the scan gets shared GitHub runners rate-limited (HTTP 429), so fill the local Maven
+      # repository first (restored from the same cache the backend CI job uses) and scan with --offline-scan.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Resolve backend dependencies into the local Maven repository
+        working-directory: backend
+        run: ./mvnw -B -q dependency:resolve
+      - name: Install Trivy (official release, checksum verified)
+        run: |
+          v=0.75.0
+          base=https://github.com/aquasecurity/trivy/releases/download/v$v
+          curl -sSfLO "$base/trivy_${v}_Linux-64bit.tar.gz"
+          curl -sSfLO "$base/trivy_${v}_checksums.txt"
+          sha256sum --ignore-missing -c "trivy_${v}_checksums.txt"
+          tar -xzf "trivy_${v}_Linux-64bit.tar.gz" trivy
+          ./trivy --version
+      - name: Report for the Security tab
+        run: ./trivy fs --config trivy.yaml --scanners vuln,secret,misconfig --offline-scan --format sarif --output trivy-repo.sarif --exit-code 0 .
+      - uses: github/codeql-action/upload-sarif@v4
+        if: ${{ !cancelled() }}
+        with:
+          sarif_file: trivy-repo.sarif
+          category: trivy-repo
+      - name: Gate (fixable HIGH/CRITICAL vulnerabilities, HIGH/CRITICAL misconfigurations, secrets)
+        run: ./trivy fs --config trivy.yaml --scanners vuln,secret,misconfig --offline-scan --skip-db-update --skip-check-update --format table --exit-code 1 .
+
+  trivy-images:
+    name: Trivy (container images)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (reuses the CI layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.app }}
+          load: true
+          tags: quipmarket-${{ matrix.app }}:scan
+          cache-from: type=gha,scope=${{ matrix.app }}
+      - name: Install Trivy (official release, checksum verified)
+        run: |
+          v=0.75.0
+          base=https://github.com/aquasecurity/trivy/releases/download/v$v
+          curl -sSfLO "$base/trivy_${v}_Linux-64bit.tar.gz"
+          curl -sSfLO "$base/trivy_${v}_checksums.txt"
+          sha256sum --ignore-missing -c "trivy_${v}_checksums.txt"
+          tar -xzf "trivy_${v}_Linux-64bit.tar.gz" trivy
+          ./trivy --version
+      - name: Report for the Security tab
+        run: ./trivy image --scanners vuln --format sarif --output trivy-${{ matrix.app }}.sarif --exit-code 0 quipmarket-${{ matrix.app }}:scan
+      - uses: github/codeql-action/upload-sarif@v4
+        if: ${{ !cancelled() }}
+        with:
+          sarif_file: trivy-${{ matrix.app }}.sarif
+          category: trivy-image-${{ matrix.app }}
+      - name: Gate (fixable CRITICAL vulnerabilities in the image)
+        run: ./trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --skip-db-update --format table --exit-code 1 quipmarket-${{ matrix.app }}:scan
+
+  gitleaks:
+    name: gitleaks (secrets in git history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the whole history: a secret deleted later is still leaked
+      - name: Install gitleaks (official release, checksum verified)
+        run: |
+          v=8.28.0
+          base=https://github.com/gitleaks/gitleaks/releases/download/v$v
+          curl -sSfLO "$base/gitleaks_${v}_linux_x64.tar.gz"
+          curl -sSfLO "$base/gitleaks_${v}_checksums.txt"
+          sha256sum --ignore-missing -c "gitleaks_${v}_checksums.txt"
+          tar -xzf "gitleaks_${v}_linux_x64.tar.gz" gitleaks
+          ./gitleaks version
+      - name: Scan every commit
+        run: ./gitleaks git --config .gitleaks.toml --redact --no-banner --verbose .

@@ -1,0 +1,13 @@
+# Trivy settings shared by the CI steps (.github/workflows/security.yml) and local runs:
+#   trivy fs --config trivy.yaml --scanners vuln,secret,misconfig .
+severity:
+  - HIGH
+  - CRITICAL
+vulnerability:
+  ignore-unfixed: true   # report what can be fixed by upgrading; unfixed CVEs are tracked upstream
+scan:
+  skip-dirs:
+    - frontend/node_modules
+    - frontend/.nuxt
+    - frontend/.output
+    - backend/target

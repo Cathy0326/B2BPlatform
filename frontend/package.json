@@ -12,6 +12,7 @@
     "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=reports/junit.xml",
     "test:watch": "vitest",
     "typecheck": "nuxt typecheck",
+    "lint": "eslint . --max-warnings 0",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
@@ -23,7 +24,9 @@
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@nuxt/eslint": "^1.17.0",
     "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
     "typescript": "~5.9.3",
     "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12"

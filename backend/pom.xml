@@ -19,6 +19,12 @@
 
   <properties>
     <java.version>21</java.version>
+    <!-- Security overrides of versions managed by Spring Boot 4.1.1 (found by Trivy, all fixed upstream):
+         Tomcat 11.0.24: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525 (CRITICAL, auth/constraint bypass)
+         Jackson 3.1.5:  CVE-2026-89407, CVE-2026-89425, CVE-2026-68497 (HIGH, denial of service)
+         Latest patch releases of the same minor versions. Remove once a Spring Boot release manages these or newer. -->
+    <tomcat.version>11.0.26</tomcat.version>
+    <jackson-bom.version>3.1.7</jackson-bom.version>
     <spring-modulith.version>2.1.1</spring-modulith.version>
     <stripe-java.version>34.0.0</stripe-java.version>
   </properties>
@@ -160,6 +166,32 @@
               <goal>integration-test</goal>
               <goal>verify</goal>
             </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <!-- Static analysis: SpotBugs finds bug patterns in the bytecode (null handling, concurrency, resource leaks);
+             the Find Security Bugs plugin adds OWASP-style security rules (injection, weak crypto, unsafe deserialization).
+             Bound to `verify`: the build fails on any finding not explicitly justified in spotbugs-exclude.xml. -->
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.9.8.1</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Medium</threshold>
+          <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+          <plugins>
+            <plugin>
+              <groupId>com.h3xstream.findsecbugs</groupId>
+              <artifactId>findsecbugs-plugin</artifactId>
+              <version>1.14.0</version>
+            </plugin>
+          </plugins>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
           </execution>
         </executions>
       </plugin>
