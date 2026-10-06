@@ -45,6 +45,19 @@ class RentalPricingTest {
     }
 
     @Test
+    void reportsTheSavingAgainstTheDailyRate() {
+        var p = RentalPricing.quote(28, RATES);
+        assertThat(p.naiveDailyCents()).isEqualTo(28 * 110_000L);
+        assertThat(p.savingsCents()).isEqualTo(28 * 110_000L - 800_000);
+    }
+
+    @Test
+    void acceptsTheFullRangeOneToThreeHundredSixtyFiveDays() {
+        assertThat(RentalPricing.quote(1, RATES).rentalDays()).isEqualTo(1);
+        assertThat(RentalPricing.quote(RentalPricing.MAX_DAYS, RATES).rentalDays()).isEqualTo(365);
+    }
+
+    @Test
     void rejectsOutOfRange() {
         assertThatThrownBy(() -> RentalPricing.quote(0, RATES)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> RentalPricing.quote(366, RATES)).isInstanceOf(IllegalArgumentException.class);

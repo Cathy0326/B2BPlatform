@@ -12,3 +12,4 @@ coverage
 *.log
 .wrangler
 reports
+test-results

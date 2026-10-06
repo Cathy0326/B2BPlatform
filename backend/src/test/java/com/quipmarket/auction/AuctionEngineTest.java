@@ -143,10 +143,67 @@ class AuctionEngineTest {
         }
 
         @Test
+        void theWindowIsStrictlyTheLastTwoMinutes() {
+            var a0 = lot(null);
+            // Exactly 120 s left is outside the window; one millisecond later is inside.
+            var atEdge = (Accepted) AuctionEngine.placeBid(a0, "alice", 6_000_000, a0.endsAt().minusSeconds(120));
+            var inside = (Accepted) AuctionEngine.placeBid(a0, "alice", 6_000_000, a0.endsAt().minusSeconds(120).plusMillis(1));
+            assertThat(atEdge.extended()).isFalse();
+            assertThat(inside.extended()).isTrue();
+        }
+
+        @Test
         void rejectsBeforeStartAndAfterEnd() {
             var a = lot(null);
             assertThat(AuctionEngine.placeBid(a, "x", 9_000_000, T0.minusMillis(1))).isEqualTo(new Rejected(Rejection.NOT_STARTED, null));
             assertThat(AuctionEngine.placeBid(a, "x", 9_000_000, a.endsAt())).isEqualTo(new Rejected(Rejection.ENDED, null));
+        }
+    }
+
+    /**
+     * Exact boundaries, added after mutation testing (PIT) showed that flipping these comparisons
+     * (for example "<" to "<=") left every other test green.
+     */
+    @Nested
+    class Boundaries {
+        @Test
+        void aBidOfExactlyTheMinimumIsAccepted() {
+            var a = bid(lot(null), "alice", 6_000_000);
+            long minimum = AuctionEngine.minimumNext(a);
+            assertThat(AuctionEngine.placeBid(a, "bob", minimum, DURING)).isInstanceOf(Accepted.class);
+            assertThat(AuctionEngine.placeBid(a, "bob", minimum - 1, DURING))
+                    .isEqualTo(new Rejected(Rejection.TOO_LOW, minimum));
+        }
+
+        @Test
+        void leaderRepeatingTheSameMaxIsRejected() {
+            var a = bid(lot(null), "alice", 6_000_000);
+            assertThat(AuctionEngine.placeBid(a, "alice", 6_000_000, DURING))
+                    .isEqualTo(new Rejected(Rejection.NOT_ABOVE_OWN_MAX, null));
+        }
+
+        @Test
+        void zeroOrNegativeMaxIsTooLowEvenBeforeTheStart() {
+            var before = T0.minusSeconds(1);
+            assertThat(AuctionEngine.placeBid(lot(null), "alice", 0, before)).isInstanceOf(Rejected.class)
+                    .extracting(o -> ((Rejected) o).reason()).isEqualTo(Rejection.TOO_LOW);
+            assertThat(AuctionEngine.placeBid(lot(null), "alice", -1, DURING)).isInstanceOf(Rejected.class)
+                    .extracting(o -> ((Rejected) o).reason()).isEqualTo(Rejection.TOO_LOW);
+        }
+
+        @Test
+        void maxExactlyAtTheReserveShowsTheReserve() {
+            var a = bid(lot(6_000_000L), "alice", 6_000_000);
+            assertThat(a.currentPriceCents()).isEqualTo(6_000_000);
+            assertThat(AuctionEngine.reserveMet(a)).isTrue();
+        }
+
+        @Test
+        void noExtraReserveBidWhenThePriceAlreadyEqualsTheReserve() {
+            // Reserve = starting price: the opening bid already meets it, so only one visible bid appears.
+            var out = (Accepted) AuctionEngine.placeBid(lot(5_000_000L), "alice", 7_000_000, DURING);
+            assertThat(out.newBids()).hasSize(1);
+            assertThat(out.state().currentPriceCents()).isEqualTo(5_000_000);
         }
     }
 

@@ -148,6 +148,13 @@
       <artifactId>spring-modulith-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Property-based testing: generates hundreds of random inputs per rule and shrinks a failure to the smallest case. -->
+    <dependency>
+      <groupId>net.jqwik</groupId>
+      <artifactId>jqwik</artifactId>
+      <version>1.10.1</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -194,6 +201,43 @@
             <goals><goal>check</goal></goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <!-- Mutation testing: PIT plants small bugs (flipped comparisons, changed constants, removed calls) in the
+             money and auction rules and reruns the unit tests. A surviving mutant is a bug the tests would miss.
+             Run: ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage  (report: target/pit-reports) -->
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>1.30.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>1.2.3</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <targetClasses>
+            <param>com.quipmarket.auction.AuctionEngine*</param>
+            <param>com.quipmarket.rental.RentalPricing*</param>
+            <param>com.quipmarket.financing.LoanCalculator*</param>
+            <param>com.quipmarket.escrow.Escrow</param>
+            <param>com.quipmarket.ledger.Ledger*</param>
+          </targetClasses>
+          <targetTests>
+            <param>com.quipmarket.*</param>
+          </targetTests>
+          <excludedTestClasses>
+            <param>*IT</param>
+          </excludedTestClasses>
+          <outputFormats>
+            <param>HTML</param>
+            <param>XML</param>
+          </outputFormats>
+          <timestampedReports>false</timestampedReports>
+          <threads>2</threads>
+          <mutationThreshold>95</mutationThreshold>
+        </configuration>
       </plugin>
       <plugin>
         <!-- Code coverage. Unit tests (surefire) and integration tests (failsafe) are recorded separately,

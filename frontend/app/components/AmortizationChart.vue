@@ -58,7 +58,7 @@ const short = (cents: number) => {
       </span>
     </figcaption>
     <div ref="plotEl" class="plot">
-      <svg :viewBox="`0 0 ${W} ${H}`" :width="W" :height="H" role="img" aria-label="Principal and interest paid per year">
+      <svg :viewBox="`0 0 ${W} ${H}`" :width="W" :height="H" role="group" aria-label="Principal and interest paid per year">
         <g v-for="t in ticks" :key="t">
           <line :x1="PAD.left" :x2="W - PAD.right" :y1="y(t)" :y2="y(t)" class="grid" />
           <text :x="PAD.left - 8" :y="y(t) + 4" text-anchor="end" class="axis">{{ short(t) }}</text>
@@ -90,6 +90,7 @@ const short = (cents: number) => {
             :height="innerH"
             fill="transparent"
             tabindex="0"
+            role="img"
             :aria-label="`Year ${r.year}: principal ${formatCents(r.principalCents)}, interest ${formatCents(r.interestCents)}`"
             @mouseenter="hover = i"
             @mouseleave="hover = null"

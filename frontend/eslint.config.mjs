@@ -2,5 +2,5 @@
 import withNuxt from './.nuxt/eslint.config.mjs'
 
 export default withNuxt({
-  ignores: ['reports/**', '.output/**', '.wrangler/**'],
+  ignores: ['reports/**', 'test-results/**', '.output/**', '.wrangler/**'],
 })

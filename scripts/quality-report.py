@@ -7,11 +7,13 @@ Inputs (all optional; missing reports are listed as "not found" instead of faili
   backend/target/failsafe-reports/TEST-*.xml     JUnit XML, backend integration tests (Testcontainers)
   backend/target/site/jacoco/jacoco.csv          JaCoCo coverage, unit + integration merged
   frontend/reports/junit.xml                     JUnit XML, Vitest
+  frontend/reports/e2e-junit.xml                 JUnit XML, Playwright browser tests (journeys + axe)
   frontend/reports/coverage/coverage-summary.json  Vitest (v8) coverage of the logic layer
+  backend/target/pit-reports/mutations.xml       PIT mutation testing of the money and auction rules
 
 Outputs:
   Markdown on stdout (CI appends it to $GITHUB_STEP_SUMMARY, so it shows on every run page)
-  --badges DIR: shields.io endpoint JSON files (tests.json, coverage-backend.json, coverage-frontend.json)
+  --badges DIR: shields.io endpoint JSON files (tests.json, coverage-backend.json, coverage-frontend.json, mutation.json)
 
 Usage: python3 scripts/quality-report.py [--root .] [--badges badges]
 """
@@ -83,6 +85,9 @@ def gates(root):
             m = re.search(rf"<counter>{counter}</counter><value>COVEREDRATIO</value><minimum>([0-9.]+)</minimum>", text)
             if m:
                 out[("backend", key)] = float(m.group(1)) * 100
+        m = re.search(r"<mutationThreshold>([0-9.]+)</mutationThreshold>", text)
+        if m:
+            out[("backend", "mutation")] = float(m.group(1))
     cfg = os.path.join(root, "frontend/vitest.config.ts")
     if os.path.exists(cfg):
         m = re.search(r"thresholds:\s*\{([^}]*)\}", open(cfg).read())
@@ -90,6 +95,16 @@ def gates(root):
             for key, value in re.findall(r"(\w+):\s*([0-9.]+)", m.group(1)):
                 out[("frontend", key)] = float(value)
     return out
+
+
+def pit(path):
+    """PIT mutations.xml: how many planted bugs the tests caught, and the ones they missed."""
+    mutations = list(ET.parse(path).getroot().iter("mutation"))
+    killed = sum(1 for m in mutations if m.get("status") in ("KILLED", "TIMED_OUT", "MEMORY_ERROR"))
+    survivors = [f"{m.findtext('mutatedClass').rsplit('.', 1)[-1]}.{m.findtext('mutatedMethod')} line {m.findtext('lineNumber')}: "
+                 f"{m.findtext('description')} ({m.get('status').lower().replace('_', ' ')})"
+                 for m in mutations if m.get("status") in ("SURVIVED", "NO_COVERAGE")]
+    return {"score": pct(killed, len(mutations)), "killed": killed, "total": len(mutations), "survivors": survivors}
 
 
 def vitest(path):
@@ -109,6 +124,7 @@ def main():
         ("Backend unit (JUnit)", sorted(glob.glob(at("backend/target/surefire-reports/TEST-*.xml")))),
         ("Backend integration (Testcontainers + PostgreSQL)", sorted(glob.glob(at("backend/target/failsafe-reports/TEST-*.xml")))),
         ("Frontend unit (Vitest)", [p for p in [at("frontend/reports/junit.xml")] if os.path.exists(p)]),
+        ("Browser journeys + accessibility (Playwright, axe)", [p for p in [at("frontend/reports/e2e-junit.xml")] if os.path.exists(p)]),
     ]
     results = [(name, junit(paths) if paths else None) for name, paths in suites]
     found = [r for _, r in results if r]
@@ -152,6 +168,22 @@ def main():
         for name, (p, c, t) in sorted(backend["modules"].items(), key=lambda kv: -kv[1][0]):
             out.append(f"| {name} | {c}/{t} | `{bar(p)}` {p:.1f}% |")
         out += ["", "</details>"]
+    mutation_path = at("backend/target/pit-reports/mutations.xml")
+    mutation = pit(mutation_path) if os.path.exists(mutation_path) else None
+    floor_m = floors.get(("backend", "mutation"))
+    out += ["", "### Mutation testing (PIT)", "",
+            "PIT plants small bugs in the money and auction rules (flipped comparisons, changed constants, removed calls) "
+            "and reruns the unit tests. A mutant the tests catch is *killed*; a survivor is a bug the tests would miss.", "",
+            "| Scope | Mutation score | Killed | Gate (CI fails below) |", "|---|---|---|---|"]
+    gate_m = f"score ≥ {floor_m:.0f}%" if floor_m else "none"
+    if mutation is None:
+        out.append(f"| Fee, ledger, rental pricing, loans, auction engine | report not found | | {gate_m} |")
+    else:
+        ok = floor_m is None or mutation["score"] >= floor_m
+        out.append(f"| Fee, ledger, rental pricing, loans, auction engine | `{bar(mutation['score'])}` **{mutation['score']:.1f}%** "
+                   f"| {mutation['killed']}/{mutation['total']} | {'✅' if ok else '❌'} {gate_m} |")
+        if mutation["survivors"]:
+            out += ["", "<details><summary>Surviving mutants</summary>", ""] + [f"- {x}" for x in mutation["survivors"]] + ["", "</details>"]
     print("\n".join(out))
 
     if args.badges:
@@ -161,6 +193,8 @@ def main():
         badge("tests.json", "tests", f"{passed}/{total} passed ({rate:.0f}%)", "brightgreen" if failed == 0 and total else "red")
         if backend:
             badge("coverage-backend.json", "backend coverage", f"{backend['lines']:.0f}%", color(backend["lines"], 80, 60))
+        if mutation:
+            badge("mutation.json", "mutation score", f"{mutation['score']:.0f}%", color(mutation["score"], 80, 60))
         if frontend:
             badge("coverage-frontend.json", "frontend logic coverage", f"{frontend['lines']:.0f}%", color(frontend["lines"], 80, 60))
 
